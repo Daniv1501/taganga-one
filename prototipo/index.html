@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#004A87">
+<meta name="description" content="Taganga One: salvaguarda territorial, sensibilización turística y control del territorio ancestral de Taganga.">
+<title>Taganga One</title>
+
+<!-- Aplicación web instalable (PWA) -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Taganga One">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<!-- Leaflet (mapa interactivo) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<style>
+/* =========================================================
+   1. VARIABLES / PALETA
+   ========================================================= */
+:root{
+  --azul:#004A87;
+  --azul-osc:#00335E;
+  --azul-claro:#E6EEF6;
+  --dorado:#D17900;
+  --dorado-claro:#FBF0E0;
+  --verde:#005C06;
+  --verde-claro:#E5F0E6;
+  --rojo:#A3231B;
+  --texto:#16202B;
+  --texto-suave:#55626F;
+  --fondo:#F4F6F8;
+  --tarjeta:#FFFFFF;
+  --borde:#DCE2E8;
+  --radio:16px;
+  --sombra:0 4px 18px rgba(0,40,80,.08);
+  --nav-h:64px;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  background:var(--fondo);
+  color:var(--texto);
+  font-size:16px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;
+}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+:focus-visible{outline:3px solid var(--dorado);outline-offset:2px}
+.hidden{display:none !important}
+
+/* =========================================================
+   MARCO DE TELÉFONO
+   - En celulares reales (< 600px): la app ocupa toda la pantalla.
+   - En computador/proyector: la app se muestra dentro de un
+     teléfono simulado (bisel, isla dinámica, barra de estado).
+   ========================================================= */
+:root{--app-h:100dvh}
+.stage{min-height:100%}
+.phone{position:relative}
+.status-bar,.home-indicator,.phone-btn{display:none}
+.app{
+  max-width:480px;
+  min-height:100%;
+  margin:0 auto;
+  background:var(--fondo);
+  position:relative;
+}
+
+@media (min-width:600px){
+  html,body{height:100%;overflow:hidden}
+  body{
+    background:
+      radial-gradient(circle at 15% 20%,rgba(209,121,0,.25) 0,transparent 40%),
+      radial-gradient(circle at 85% 85%,rgba(0,92,6,.35) 0,transparent 45%),
+      linear-gradient(160deg,var(--azul) 0%,var(--azul-osc) 60%,#001A33 100%);
+  }
+  .stage{
+    height:100%;display:flex;align-items:center;justify-content:center;padding:8px;
+  }
+
+  /* Teléfono */
+  .phone{
+    --phone-h:min(940px,calc(100vh - 16px));
+    --app-h:calc(var(--phone-h) - 24px - 44px);   /* alto útil: sin bisel ni barra de estado */
+    width:calc(var(--phone-h) * 0.49);            /* proporción de teléfono grande */
+    height:var(--phone-h);
+    flex-shrink:0;
+    border-radius:54px;
+    padding:12px;
+    background:#111;
+    box-shadow:
+      0 0 0 2px #3A3A3C,
+      0 0 0 5px #1C1C1E,
+      0 30px 80px rgba(0,0,0,.55),
+      inset 0 0 3px rgba(255,255,255,.25);
+    transform:translateZ(0); /* hace que los elementos "fixed" queden dentro del teléfono */
+  }
+  .phone-btn{display:block;position:absolute;background:#2C2C2E;border-radius:3px;width:4px}
+  .phone-btn.b1{left:-8px;top:120px;height:32px}
+  .phone-btn.b2{left:-8px;top:175px;height:60px}
+  .phone-btn.b3{left:-8px;top:245px;height:60px}
+  .phone-btn.b4{right:-8px;top:200px;height:90px}
+  .screen{
+    position:relative;width:100%;height:100%;
+    border-radius:42px;overflow:hidden;background:var(--fondo);
+    transform:translateZ(0); /* contenedor de bottom-nav, modal y toast */
+    display:flex;flex-direction:column;
+  }
+  .status-bar{
+    display:flex;align-items:center;justify-content:space-between;
+    height:44px;flex-shrink:0;padding:0 28px 0 34px;
+    background:var(--azul);color:#fff;font-size:.85rem;font-weight:700;
+    position:relative;z-index:1500;transition:background .3s;
+  }
+  .status-bar.light{background:var(--azul)}
+  .status-icons{display:flex;gap:6px;align-items:center}
+  .status-bar::after{ /* isla dinámica */
+    content:"";position:absolute;left:50%;top:10px;transform:translateX(-50%);
+    width:110px;height:30px;border-radius:20px;background:#000;
+  }
+  .app{
+    flex:1;width:100%;max-width:none;min-height:0;height:var(--app-h);
+    overflow-y:auto;overflow-x:hidden;scrollbar-width:none;
+  }
+  .app::-webkit-scrollbar{display:none}
+  .home-indicator{
+    display:block;position:absolute;bottom:7px;left:50%;transform:translateX(-50%);
+    width:120px;height:5px;border-radius:3px;background:rgba(0,0,0,.75);z-index:1600;pointer-events:none;
+  }
+  .bottom-nav{left:0;transform:none;max-width:none;padding-bottom:18px;height:calc(var(--nav-h) + 18px)}
+  .bottom-nav button{font-size:.64rem;white-space:nowrap}
+  .segmented button{font-size:.88rem}
+  main{padding-bottom:calc(var(--nav-h) + 38px)}
+  .modal-sheet{max-width:none;padding-bottom:30px}
+  .toast{bottom:calc(var(--nav-h) + 30px)}
+}
+
+/* =========================================================
+   2. PANTALLA 1 · REGISTRO / INICIO DE SESIÓN
+   ========================================================= */
+.auth-hero{
+  background:
+    radial-gradient(circle at 85% 10%,rgba(209,121,0,.35) 0,transparent 45%),
+    linear-gradient(165deg,var(--azul) 0%,var(--azul-osc) 100%);
+  color:#fff;
+  padding:40px 24px 64px;
+  position:relative;
+  overflow:hidden;
+}
+.auth-hero::after{ /* ola decorativa */
+  content:"";position:absolute;left:0;right:0;bottom:-1px;height:40px;
+  background:var(--fondo);
+  border-radius:50% 50% 0 0/100% 100% 0 0;
+}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.brand-logo{
+  width:52px;height:52px;border-radius:14px;
+  background:#fff;display:grid;place-items:center;flex-shrink:0;
+  box-shadow:0 4px 14px rgba(0,0,0,.2);
+}
+.brand-name{font-size:1.6rem;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.brand-name span{color:var(--dorado)}
+.brand-sub{font-size:.82rem;opacity:.85}
+.auth-hero h1{font-size:1.25rem;font-weight:700;margin-bottom:6px;max-width:30ch}
+.auth-hero p{font-size:.92rem;opacity:.9;max-width:38ch}
+
+.auth-card{
+  background:var(--tarjeta);
+  margin:-28px 16px 24px;
+  border-radius:var(--radio);
+  box-shadow:var(--sombra);
+  padding:20px;
+  position:relative;z-index:2;
+}
+.segmented{
+  display:grid;grid-template-columns:1fr 1fr;
+  background:var(--azul-claro);border-radius:12px;padding:4px;margin-bottom:18px;
+}
+.segmented button{
+  min-height:44px;border-radius:9px;font-weight:600;color:var(--azul);
+  transition:background .2s,color .2s;
+}
+.segmented button[aria-selected="true"]{background:var(--azul);color:#fff;box-shadow:0 2px 6px rgba(0,74,135,.3)}
+
+.field{margin-bottom:14px}
+.field label{display:block;font-size:.85rem;font-weight:600;margin-bottom:6px;color:var(--azul-osc)}
+.field input,.field select{
+  width:100%;min-height:48px;padding:12px 14px;
+  border:1.5px solid var(--borde);border-radius:12px;background:#fff;
+  font-size:16px; /* evita zoom en iOS */
+  transition:border-color .2s,box-shadow .2s;
+}
+.field input:focus,.field select:focus{outline:none;border-color:var(--azul);box-shadow:0 0 0 3px rgba(0,74,135,.15)}
+.field.invalid input,.field.invalid select{border-color:var(--rojo)}
+.field .err{display:none;color:var(--rojo);font-size:.8rem;margin-top:4px}
+.field.invalid .err{display:block}
+.row-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+.consent{
+  background:var(--dorado-claro);
+  border:1.5px solid rgba(209,121,0,.45);
+  border-left:5px solid var(--dorado);
+  border-radius:12px;padding:14px;margin:6px 0 16px;
+}
+.consent.invalid{border-color:var(--rojo);border-left-color:var(--rojo);background:#FCEBEA}
+.consent-check{display:flex;gap:12px;align-items:flex-start;cursor:pointer}
+.consent-check input{
+  appearance:none;-webkit-appearance:none;flex-shrink:0;
+  width:26px;height:26px;margin-top:2px;border-radius:7px;
+  border:2px solid var(--dorado);background:#fff;display:grid;place-items:center;
+  transition:background .15s;
+}
+.consent-check input:checked{background:var(--verde);border-color:var(--verde)}
+.consent-check input:checked::after{
+  content:"";width:7px;height:13px;border:solid #fff;border-width:0 3px 3px 0;
+  transform:rotate(45deg) translate(-1px,-1px);
+}
+.consent-text{font-size:.84rem;color:#4A3300}
+.consent-text strong{color:var(--texto)}
+.link-btn{color:var(--azul);font-weight:600;text-decoration:underline;padding:0;font-size:inherit;display:inline}
+.consent .err{display:none;color:var(--rojo);font-size:.8rem;margin-top:8px;font-weight:600}
+.consent.invalid .err{display:block}
+
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  width:100%;min-height:52px;border-radius:14px;
+  font-weight:700;font-size:1rem;letter-spacing:.01em;
+  transition:transform .1s,filter .2s;
+}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:var(--dorado);color:#fff;box-shadow:0 6px 16px rgba(209,121,0,.35)}
+.btn-primary:hover{filter:brightness(1.05)}
+.btn-outline{border:2px solid var(--azul);color:var(--azul);background:#fff}
+.auth-foot{text-align:center;font-size:.78rem;color:var(--texto-suave);padding:0 24px 32px}
+.auth-foot b{color:var(--verde)}
+
+/* Modal aviso de privacidad */
+.modal{
+  position:fixed;inset:0;background:rgba(0,20,40,.6);
+  display:flex;align-items:flex-end;justify-content:center;z-index:2000;
+  animation:fade .2s;
+}
+.modal-sheet{
+  background:#fff;width:100%;max-width:480px;max-height:85vh;overflow:auto;
+  border-radius:20px 20px 0 0;padding:20px 20px calc(20px + var(--safe-b));
+  animation:up .25s ease-out;
+}
+.modal-sheet h2{color:var(--azul);font-size:1.15rem;margin-bottom:10px}
+.modal-sheet h3{color:var(--verde);font-size:.95rem;margin:14px 0 4px}
+.modal-sheet p,.modal-sheet li{font-size:.88rem;color:var(--texto-suave)}
+.modal-sheet ul{padding-left:18px}
+.modal-sheet .btn{margin-top:18px}
+@keyframes fade{from{opacity:0}}
+@keyframes up{from{transform:translateY(40px);opacity:0}}
+
+/* =========================================================
+   3. PANTALLA 2 · APP PRINCIPAL
+   ========================================================= */
+.topbar{
+  position:sticky;top:0;z-index:1000;
+  background:var(--azul);color:#fff;
+  padding:12px 16px;display:flex;align-items:center;gap:12px;
+  box-shadow:0 2px 10px rgba(0,0,0,.15);
+}
+.topbar .brand-logo{width:40px;height:40px;border-radius:11px}
+.topbar-title{flex:1;min-width:0}
+.topbar-title b{display:block;font-size:1.05rem;line-height:1.2}
+.topbar-title b span{color:var(--dorado)}
+.topbar-title small{font-size:.78rem;opacity:.85;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.icon-btn{
+  width:44px;height:44px;border-radius:12px;display:grid;place-items:center;
+  background:rgba(255,255,255,.12);color:#fff;flex-shrink:0;
+}
+.icon-btn:active{background:rgba(255,255,255,.25)}
+
+main{padding:16px 16px calc(var(--nav-h) + 24px + var(--safe-b))}
+
+.welcome{
+  background:linear-gradient(135deg,var(--verde) 0%,#0B7A14 100%);
+  color:#fff;border-radius:var(--radio);padding:16px;margin-bottom:16px;
+  display:flex;gap:14px;align-items:center;box-shadow:var(--sombra);
+}
+.welcome-badge{
+  background:rgba(255,255,255,.15);border:1.5px dashed rgba(255,255,255,.6);
+  border-radius:12px;padding:8px 10px;text-align:center;flex-shrink:0;
+}
+.welcome-badge small{display:block;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;opacity:.85}
+.welcome-badge b{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.95rem}
+.welcome h2{font-size:1.05rem;line-height:1.25}
+.welcome p{font-size:.82rem;opacity:.9}
+
+.card{
+  background:var(--tarjeta);border-radius:var(--radio);box-shadow:var(--sombra);
+  margin-bottom:18px;overflow:hidden;scroll-margin-top:80px;
+}
+.card-head{padding:16px 16px 10px;display:flex;align-items:center;gap:10px}
+.card-head .ico{
+  width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex-shrink:0;
+}
+.card-head h2{font-size:1.08rem;line-height:1.2}
+.card-head p{font-size:.8rem;color:var(--texto-suave)}
+.ico-azul{background:var(--azul-claro);color:var(--azul)}
+.ico-dorado{background:var(--dorado-claro);color:var(--dorado)}
+.ico-verde{background:var(--verde-claro);color:var(--verde)}
+
+/* --- Mapa --- */
+.map-filters{
+  display:flex;gap:8px;overflow-x:auto;padding:0 16px 12px;
+  scrollbar-width:none;
+}
+.map-filters::-webkit-scrollbar{display:none}
+.chip{
+  flex-shrink:0;min-height:38px;padding:6px 12px;border-radius:999px;
+  border:1.5px solid var(--borde);background:#fff;font-size:.82rem;font-weight:600;
+  display:flex;align-items:center;gap:6px;transition:all .15s;
+}
+.chip .dot{width:10px;height:10px;border-radius:50%}
+.chip[aria-pressed="false"]{opacity:.45;text-decoration:line-through}
+#map{height:340px;width:100%;background:var(--azul-claro);z-index:1}
+.map-fallback{
+  height:340px;display:grid;place-items:center;text-align:center;padding:24px;
+  color:var(--texto-suave);font-size:.9rem;background:var(--azul-claro);
+}
+.legend{padding:12px 16px 4px;display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.legend div{display:flex;align-items:center;gap:8px;font-size:.78rem}
+.legend i{width:18px;height:12px;border-radius:3px;flex-shrink:0;border:2px solid}
+.map-note{font-size:.74rem;color:var(--texto-suave);padding:8px 16px 16px}
+
+.site-info{
+  margin:0 16px 16px;border-radius:12px;padding:12px 14px;
+  border-left:5px solid var(--azul);background:var(--azul-claro);
+  font-size:.86rem;
+}
+.site-info b{display:block;margin-bottom:2px}
+.site-info .tag{
+  display:inline-block;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+  padding:2px 8px;border-radius:999px;color:#fff;margin-bottom:6px;
+}
+
+/* Popups Leaflet */
+.leaflet-popup-content{margin:12px 14px;font-family:inherit}
+.pop-tag{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#fff;padding:2px 8px;border-radius:999px;display:inline-block;margin-bottom:4px}
+.pop-title{font-weight:700;font-size:.95rem;color:var(--texto)}
+.pop-rule{font-size:.8rem;color:var(--texto-suave);margin-top:4px}
+
+/* --- Decálogo --- */
+.decalogo{border-top:5px solid var(--dorado)}
+.decalogo ol{list-style:none;padding:0 16px 8px;counter-reset:d}
+.decalogo li{
+  counter-increment:d;display:flex;gap:12px;align-items:flex-start;
+  padding:10px 0;border-bottom:1px solid var(--borde);font-size:.9rem;
+}
+.decalogo li:last-child{border-bottom:none}
+.decalogo li::before{
+  content:counter(d);flex-shrink:0;width:28px;height:28px;border-radius:50%;
+  background:var(--azul);color:#fff;font-weight:700;font-size:.8rem;display:grid;place-items:center;
+}
+.decalogo li:nth-child(3n+2)::before{background:var(--verde)}
+.decalogo li:nth-child(3n)::before{background:var(--dorado)}
+.decalogo li b{color:var(--azul-osc)}
+.decalogo-foot{
+  background:var(--verde-claro);color:var(--verde);font-size:.8rem;font-weight:600;
+  padding:12px 16px;display:flex;gap:8px;align-items:center;
+}
+
+/* --- Asistente IA --- */
+.chat{display:flex;flex-direction:column;border-top:5px solid var(--azul)}
+.chat-status{display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--verde);font-weight:600}
+.chat-status::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--verde);box-shadow:0 0 0 3px var(--verde-claro)}
+.chat-log{
+  height:360px;overflow-y:auto;padding:14px 12px;
+  background:linear-gradient(180deg,#F7F9FB 0%,#EEF3F7 100%);
+  display:flex;flex-direction:column;gap:10px;
+  border-top:1px solid var(--borde);border-bottom:1px solid var(--borde);
+  scroll-behavior:smooth;
+}
+.msg{max-width:86%;padding:10px 13px;border-radius:16px;font-size:.9rem;animation:pop .2s ease-out;word-wrap:break-word}
+.msg p+p,.msg p+ul,.msg ul+p{margin-top:6px}
+.msg ul{padding-left:18px}
+.msg li{margin:2px 0}
+.msg-bot{background:#fff;border:1px solid var(--borde);border-bottom-left-radius:4px;align-self:flex-start}
+.msg-bot .who{font-size:.7rem;font-weight:700;color:var(--azul);margin-bottom:3px;display:flex;align-items:center;gap:4px}
+.msg-user{background:var(--azul);color:#fff;border-bottom-right-radius:4px;align-self:flex-end}
+.typing{display:flex;gap:4px;padding:14px 16px}
+.typing span{width:7px;height:7px;border-radius:50%;background:var(--azul);opacity:.4;animation:blink 1.2s infinite}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes blink{50%{opacity:1;transform:translateY(-3px)}}
+@keyframes pop{from{opacity:0;transform:translateY(6px)}}
+
+.suggest-label{font-size:.75rem;font-weight:700;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.06em;padding:12px 16px 6px}
+.suggestions{display:flex;flex-wrap:wrap;gap:8px;padding:0 12px 12px}
+.suggestions button{
+  min-height:40px;padding:8px 12px;border-radius:12px;text-align:left;
+  font-size:.82rem;font-weight:600;line-height:1.3;
+  background:var(--dorado-claro);color:#6B3E00;border:1.5px solid rgba(209,121,0,.4);
+  transition:background .15s;
+}
+.suggestions button:active{background:var(--dorado);color:#fff}
+.chat-bar{
+  display:flex;gap:8px;padding:12px;background:#fff;border-top:1px solid var(--borde);
+}
+.chat-bar input{
+  flex:1;min-width:0;min-height:48px;padding:10px 16px;border-radius:999px;
+  border:1.5px solid var(--borde);font-size:16px;background:var(--fondo);
+}
+.chat-bar input:focus{outline:none;border-color:var(--azul);background:#fff}
+.send-btn{
+  width:48px;height:48px;border-radius:50%;background:var(--verde);color:#fff;
+  display:grid;place-items:center;flex-shrink:0;transition:transform .1s;
+}
+.send-btn:active{transform:scale(.92)}
+.send-btn:disabled{background:#9AA7B3}
+
+/* --- Navegación inferior --- */
+.bottom-nav{
+  position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:480px;z-index:1000;
+  height:calc(var(--nav-h) + var(--safe-b));padding-bottom:var(--safe-b);
+  background:#fff;border-top:1px solid var(--borde);
+  display:grid;grid-template-columns:repeat(3,1fr);
+  box-shadow:0 -4px 16px rgba(0,0,0,.08);
+}
+.bottom-nav button{
+  --c:var(--azul);--c-claro:var(--azul-claro);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  font-size:.7rem;font-weight:600;color:var(--texto-suave);position:relative;
+  transition:color .2s;
+}
+.bottom-nav button[data-color="verde"]{--c:var(--verde);--c-claro:var(--verde-claro)}
+.bottom-nav button[data-color="dorado"]{--c:var(--dorado);--c-claro:var(--dorado-claro)}
+.nav-pill{
+  width:56px;height:30px;border-radius:999px;display:grid;place-items:center;
+  transition:background .25s,transform .2s;
+}
+.bottom-nav button.active{color:var(--c);font-weight:800}
+.bottom-nav button.active .nav-pill{background:var(--c-claro);transform:scale(1.05)}
+.bottom-nav button.active::before{
+  content:"";position:absolute;top:0;width:40px;height:4px;border-radius:0 0 4px 4px;background:var(--c);
+}
+.bottom-nav button:active .nav-pill{transform:scale(.92)}
+
+/* --- Módulos (SPA) --- */
+.module{animation:modIn .25s ease-out}
+@keyframes modIn{from{opacity:0;transform:translateY(8px)}}
+#map{height:calc(var(--app-h) - 430px);min-height:300px}
+/* El chat ocupa toda la altura disponible del módulo */
+#mod-asistente .chat{margin-bottom:0}
+#mod-asistente .chat-log{height:calc(var(--app-h) - 400px);min-height:240px}
+#mod-asistente .suggestions{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:12px}
+#mod-asistente .suggestions::-webkit-scrollbar{display:none}
+#mod-asistente .suggestions button{flex-shrink:0;max-width:220px}
+
+.toast{
+  position:fixed;left:50%;bottom:calc(var(--nav-h) + 16px + var(--safe-b));transform:translateX(-50%);
+  background:var(--texto);color:#fff;padding:10px 16px;border-radius:12px;font-size:.85rem;
+  z-index:3000;max-width:90%;text-align:center;animation:pop .2s;
+}
+
+/* =========================================================
+   AVISO "INSTALAR APP" (PWA)
+   ========================================================= */
+.install-bar{
+  display:flex;align-items:center;gap:12px;
+  margin:0 16px 14px;padding:12px 14px;
+  background:var(--dorado-claro);border:1px solid #F0D3A8;border-radius:var(--radio);
+}
+.install-bar img{width:40px;height:40px;border-radius:10px;flex-shrink:0}
+.install-bar .txt{flex:1;font-size:14px;line-height:1.35}
+.install-bar .txt strong{display:block;font-size:15px}
+.install-bar .btn-inst{
+  background:var(--dorado);color:#fff;font-weight:600;
+  padding:9px 14px;border-radius:999px;white-space:nowrap;
+}
+.install-bar .x{font-size:22px;line-height:1;color:var(--texto-suave);padding:4px}
+.offline-pill{
+  position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);left:50%;transform:translateX(-50%);
+  z-index:9999;background:var(--texto);color:#fff;font-size:13px;
+  padding:6px 14px;border-radius:999px;box-shadow:var(--sombra);
+}
+</style>
+</head>
+<body>
+<div class="stage">
+
+
+<div class="phone">
+ <span class="phone-btn b1"></span><span class="phone-btn b2"></span><span class="phone-btn b3"></span><span class="phone-btn b4"></span>
+ <div class="screen">
+  <div class="status-bar" aria-hidden="true">
+    <span id="clock">9:41</span>
+    <span class="status-icons">
+      <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+      <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 4.2a10 10 0 0 1 14 0M3.5 6.8a6.3 6.3 0 0 1 9 0M6 9.3a2.8 2.8 0 0 1 4 0"/></svg>
+      <svg width="26" height="12" viewBox="0 0 26 12" fill="none"><rect x=".5" y=".5" width="22" height="11" rx="3" stroke="currentColor" opacity=".6"/><rect x="2" y="2" width="17" height="8" rx="1.8" fill="currentColor"/><rect x="24" y="4" width="1.6" height="4" rx=".8" fill="currentColor" opacity=".6"/></svg>
+    </span>
+  </div>
+<div class="app" id="app">
+
+<!-- =====================================================
+     PANTALLA 1: REGISTRO / INICIO DE SESIÓN
+     ===================================================== -->
+<section id="screen-auth" aria-label="Registro de visitantes">
+  <header class="auth-hero">
+    <div class="brand">
+      <div class="brand-logo" aria-hidden="true">
+        <!-- Logotipo: sol (dorado), mar (azul), cerro (verde) -->
+        <svg width="34" height="34" viewBox="0 0 40 40">
+          <circle cx="27" cy="13" r="7" fill="#D17900"/>
+          <path d="M2 28 L14 12 L24 26 Z" fill="#005C06"/>
+          <path d="M2 30 q5-4 10 0 t10 0 t10 0 t8 0 V38 H2Z" fill="#004A87"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">Taganga <span>One</span></div>
+        <div class="brand-sub">Territorio ancestral · Santa Marta</div>
+      </div>
+    </div>
+    <h1>Bienvenido al territorio ancestral de Taganga</h1>
+    <p>Regístrate antes de tu visita. Tu registro apoya el control territorial de la comunidad y las autoridades ancestrales.</p>
+  </header>
+
+  <div class="install-bar hidden" id="install-bar">
+    <img src="icons/icon-192.png" alt="">
+    <div class="txt"><strong>Instala Taganga One</strong><span id="install-hint">Ábrela como app y úsala sin conexión.</span></div>
+    <button type="button" class="btn-inst" id="install-btn">Instalar</button>
+    <button type="button" class="x" id="install-close" aria-label="Cerrar aviso">&times;</button>
+  </div>
+
+  <div class="auth-card">
+    <div class="segmented" role="tablist" aria-label="Tipo de acceso">
+      <button type="button" role="tab" aria-selected="true" id="tab-registro" data-mode="registro">Registrarme</button>
+      <button type="button" role="tab" aria-selected="false" id="tab-ingreso" data-mode="ingreso">Ya me registré</button>
+    </div>
+
+    <form id="auth-form" novalidate>
+      <!-- Campos solo para registro -->
+      <div class="only-registro">
+        <div class="field">
+          <label for="f-nombre">Nombre completo</label>
+          <input id="f-nombre" name="nombre" type="text" autocomplete="name" placeholder="Ej. María Pérez Gómez" required>
+          <div class="err">Escribe tu nombre completo.</div>
+        </div>
+      </div>
+
+      <div class="row-2">
+        <div class="field">
+          <label for="f-tipodoc">Tipo de documento</label>
+          <select id="f-tipodoc" name="tipodoc" required>
+            <option value="CC">C.C.</option>
+            <option value="CE">C.E.</option>
+            <option value="TI">T.I.</option>
+            <option value="PA">Pasaporte</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-doc">Número</label>
+          <input id="f-doc" name="doc" type="text" inputmode="numeric" autocomplete="off" placeholder="1234567890" required>
+          <div class="err">Documento no válido.</div>
+        </div>
+      </div>
+
+      <div class="only-registro">
+        <div class="row-2">
+          <div class="field">
+            <label for="f-procedencia">Procedencia</label>
+            <input id="f-procedencia" name="procedencia" type="text" placeholder="Ciudad / país" required>
+            <div class="err">Indica tu procedencia.</div>
+          </div>
+          <div class="field">
+            <label for="f-grupo">Personas</label>
+            <input id="f-grupo" name="grupo" type="number" inputmode="numeric" min="1" max="50" value="1" required>
+            <div class="err">Entre 1 y 50.</div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="f-correo">Correo electrónico</label>
+          <input id="f-correo" name="correo" type="email" autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com" required>
+          <div class="err">Escribe un correo válido.</div>
+        </div>
+
+        <div class="row-2">
+          <div class="field">
+            <label for="f-fecha">Fecha de visita</label>
+            <input id="f-fecha" name="fecha" type="date" required>
+            <div class="err">Elige una fecha.</div>
+          </div>
+          <div class="field">
+            <label for="f-motivo">Motivo</label>
+            <select id="f-motivo" name="motivo">
+              <option>Turismo</option>
+              <option>Buceo / snorkel</option>
+              <option>Académico</option>
+              <option>Visita familiar</option>
+              <option>Otro</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- AUTORIZACIÓN OBLIGATORIA LEY 1581 DE 2012 -->
+        <div class="consent" id="consent-box">
+          <label class="consent-check" for="f-consent">
+            <input type="checkbox" id="f-consent" name="consent" required aria-describedby="consent-desc">
+            <span class="consent-text" id="consent-desc">
+              <strong>Autorizo de manera previa, expresa e informada</strong> el tratamiento de mis datos personales conforme a la <strong>Ley 1581 de 2012</strong> (Habeas Data) y el Decreto 1377 de 2013, con la finalidad exclusiva de control de visitantes por parte de la comunidad y las autoridades ancestrales de Taganga.
+              <button type="button" class="link-btn" id="open-privacy">Leer aviso de privacidad</button>
+            </span>
+          </label>
+          <div class="err" role="alert">Debes aceptar la autorización de tratamiento de datos para continuar.</div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="submit-btn">
+        <span id="submit-label">Registrarme e ingresar</span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+    </form>
+  </div>
+
+  <p class="auth-foot">Tus datos <b>no se venden ni se ceden</b> a terceros. Sin cobros, sin pasarelas de pago y sin rastreo GPS.</p>
+</section>
+
+<!-- Modal: Aviso de privacidad -->
+<div class="modal hidden" id="privacy-modal" role="dialog" aria-modal="true" aria-labelledby="privacy-title">
+  <div class="modal-sheet">
+    <h2 id="privacy-title">Aviso de privacidad · Taganga One</h2>
+    <p>En cumplimiento de la Ley Estatutaria 1581 de 2012 y el Decreto 1377 de 2013, te informamos:</p>
+    <h3>Responsable</h3>
+    <p>Comunidad de Taganga y sus autoridades ancestrales (Hermanos Mayores), con apoyo del equipo del proyecto Taganga One.</p>
+    <h3>Finalidad</h3>
+    <ul>
+      <li>Registro y control ordenado del ingreso de visitantes al territorio.</li>
+      <li>Estadísticas agregadas de afluencia para la gestión territorial.</li>
+      <li>Envío de información de sensibilización ambiental y cultural.</li>
+    </ul>
+    <h3>Tus derechos como titular</h3>
+    <ul>
+      <li>Conocer, actualizar y rectificar tus datos.</li>
+      <li>Solicitar prueba de esta autorización.</li>
+      <li>Revocar la autorización y pedir la supresión de tus datos.</li>
+      <li>Presentar quejas ante la Superintendencia de Industria y Comercio.</li>
+    </ul>
+    <h3>Lo que no haremos</h3>
+    <p>No vendemos, comercializamos ni cedemos la base de datos a empresas privadas. No realizamos rastreo GPS individual.</p>
+    <p style="margin-top:10px;font-style:italic">Prototipo académico: en esta versión los datos se guardan solo en este dispositivo (no se envían a ningún servidor). Se borran al cerrar sesión desde el navegador o al limpiar los datos del sitio.</p>
+    <button type="button" class="btn btn-primary" id="accept-privacy">Entendido, acepto</button>
+    <button type="button" class="btn btn-outline" id="close-privacy" style="margin-top:10px">Cerrar</button>
+  </div>
+</div>
+
+<!-- =====================================================
+     PANTALLA 2: INTERFAZ PRINCIPAL
+     ===================================================== -->
+<section id="screen-main" class="hidden" aria-label="Taganga One">
+  <header class="topbar">
+    <div class="brand-logo" aria-hidden="true">
+      <svg width="26" height="26" viewBox="0 0 40 40">
+        <circle cx="27" cy="13" r="7" fill="#D17900"/>
+        <path d="M2 28 L14 12 L24 26 Z" fill="#005C06"/>
+        <path d="M2 30 q5-4 10 0 t10 0 t10 0 t8 0 V38 H2Z" fill="#004A87"/>
+      </svg>
+    </div>
+    <div class="topbar-title">
+      <b>Taganga <span>One</span></b>
+      <small id="topbar-user">Visitante</small>
+    </div>
+    <button class="icon-btn" id="logout-btn" aria-label="Cerrar sesión" title="Cerrar sesión">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+    </button>
+  </header>
+
+  <main>
+   <!-- MÓDULO 1: MAPA TERRITORIAL -->
+   <div class="module" id="mod-mapa" role="tabpanel" aria-labelledby="nav-mapa">
+    <div class="welcome">
+      <div style="flex:1;min-width:0">
+        <h2 id="welcome-title">¡Bienvenido!</h2>
+        <p>Muestra tu código a la autoridad comunitaria si te lo solicitan.</p>
+      </div>
+      <div class="welcome-badge">
+        <small>Código</small>
+        <b id="visitor-code">TG-0000</b>
+      </div>
+    </div>
+
+    <!-- ===== MAPA ===== -->
+    <article class="card" id="sec-mapa">
+      <div class="card-head">
+        <div class="ico ico-azul" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg>
+        </div>
+        <div>
+          <h2>Mapa de locaciones sagradas</h2>
+          <p>Toca una zona para ver sus normas</p>
+        </div>
+      </div>
+
+      <div class="map-filters" role="group" aria-label="Filtrar capas del mapa">
+        <button class="chip" data-layer="libre" aria-pressed="true"><span class="dot" style="background:#004A87"></span>Libre tránsito</button>
+        <button class="chip" data-layer="sagrado" aria-pressed="true"><span class="dot" style="background:#D17900"></span>Sagrado</button>
+        <button class="chip" data-layer="ecologico" aria-pressed="true"><span class="dot" style="background:#005C06"></span>Ecológico</button>
+        <button class="chip" data-layer="pesca" aria-pressed="true"><span class="dot" style="background:#A3231B"></span>Reserva pesquera</button>
+      </div>
+
+      <div id="map" role="application" aria-label="Mapa interactivo de Taganga"></div>
+
+      <div class="legend" aria-hidden="true">
+        <div><i style="background:rgba(0,74,135,.25);border-color:#004A87"></i>Libre tránsito turístico</div>
+        <div><i style="background:rgba(209,121,0,.3);border-color:#D17900"></i>Sitio sagrado / religioso</div>
+        <div><i style="background:rgba(0,92,6,.25);border-color:#005C06"></i>Protección ecológica</div>
+        <div><i style="background:rgba(163,35,27,.2);border-color:#A3231B;border-style:dashed"></i>Reserva pesca artesanal</div>
+      </div>
+
+      <div class="site-info" id="site-info" aria-live="polite">
+        <span class="tag" style="background:var(--azul)">Info</span>
+        <b>Selecciona una zona del mapa</b>
+        Verás qué está permitido y qué está restringido en cada área.
+      </div>
+      <p class="map-note">⚠ Delimitación referencial para el prototipo. Los polígonos definitivos deben validarse con la comunidad y las autoridades ancestrales.</p>
+    </article>
+   </div>
+
+   <!-- MÓDULO 3: DECÁLOGO DE CONDUCTA -->
+   <div class="module hidden" id="mod-decalogo" role="tabpanel" aria-labelledby="nav-decalogo">
+    <article class="card decalogo" id="sec-decalogo">
+      <div class="card-head">
+        <div class="ico ico-dorado" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3z"/><path d="m9 12 2 2 4-4"/></svg>
+        </div>
+        <div>
+          <h2>Decálogo del visitante</h2>
+          <p>Reglas de conducta en el territorio ancestral</p>
+        </div>
+      </div>
+      <ol id="decalogo-list"></ol>
+      <div class="decalogo-foot">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+        Al registrarte te comprometiste a cumplir este decálogo.
+      </div>
+    </article>
+   </div>
+
+   <!-- MÓDULO 2: ASISTENTE VIRTUAL -->
+   <div class="module hidden" id="mod-asistente" role="tabpanel" aria-labelledby="nav-asistente">
+    <article class="card chat" id="sec-asistente">
+      <div class="card-head">
+        <div class="ico ico-verde" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 10h.01M12 10h.01M16 10h.01"/></svg>
+        </div>
+        <div style="flex:1">
+          <h2>Asistente Virtual Taganga One</h2>
+          <div class="chat-status">En línea · IA simulada</div>
+        </div>
+      </div>
+
+      <div class="chat-log" id="chat-log" aria-live="polite" aria-label="Conversación con el asistente"></div>
+
+      <div class="suggest-label">Preguntas frecuentes</div>
+      <div class="suggestions" id="suggestions"></div>
+
+      <form class="chat-bar" id="chat-form" autocomplete="off">
+        <label for="chat-input" class="hidden">Escribe tu pregunta</label>
+        <input id="chat-input" type="text" placeholder="Escribe tu pregunta…" maxlength="300" enterkeyhint="send">
+        <button type="submit" class="send-btn" id="send-btn" aria-label="Enviar mensaje">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        </button>
+      </form>
+    </article>
+   </div>
+  </main>
+
+  <!-- BARRA DE NAVEGACIÓN INFERIOR (SPA) -->
+  <nav class="bottom-nav" role="tablist" aria-label="Módulos de Taganga One">
+    <button role="tab" id="nav-mapa" class="active" aria-selected="true" aria-controls="mod-mapa" data-module="mod-mapa" data-color="azul">
+      <span class="nav-pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg></span>
+      Mapa Territorial
+    </button>
+    <button role="tab" id="nav-asistente" aria-selected="false" aria-controls="mod-asistente" data-module="mod-asistente" data-color="verde">
+      <span class="nav-pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 10h.01M12 10h.01M16 10h.01"/></svg></span>
+      Asistente Virtual
+    </button>
+    <button role="tab" id="nav-decalogo" aria-selected="false" aria-controls="mod-decalogo" data-module="mod-decalogo" data-color="dorado">
+      <span class="nav-pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3z"/><path d="m9 12 2 2 4-4"/></svg></span>
+      Decálogo
+    </button>
+  </nav>
+</section>
+
+</div><!-- /.app -->
+  <span class="home-indicator" aria-hidden="true"></span>
+ </div><!-- /.screen -->
+</div><!-- /.phone -->
+</div><!-- /.stage -->
+
+<script>
+/* =========================================================
+   TAGANGA ONE · Lógica del prototipo (JavaScript puro)
+   ========================================================= */
+(function () {
+  "use strict";
+
+  const $ = (s, ctx = document) => ctx.querySelector(s);
+  const $$ = (s, ctx = document) => Array.from(ctx.querySelectorAll(s));
+
+  // Sube al inicio: en el marco de teléfono se desplaza el contenedor .app; en un celular real, la ventana
+  function irArriba() { const a = document.getElementById("app"); if (a) a.scrollTop = 0; window.scrollTo(0, 0); }
+
+  // Reloj de la barra de estado simulada
+  function reloj() {
+    const d = new Date(), el = document.getElementById("clock");
+    if (el) el.textContent = d.getHours() + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+  reloj(); setInterval(reloj, 30000);
+
+  // Si cambia el tamaño de la ventana (p. ej. al proyectar), reajusta el mapa
+  window.addEventListener("resize", () => state.map && state.map.invalidateSize());
+
+  /* ---------- Estado en memoria (sin backend) ---------- */
+  const state = {
+    mode: "registro",          // "registro" | "ingreso"
+    visitantes: [],            // registros de la sesión
+    actual: null,              // visitante en sesión
+    map: null,
+    capas: {}
+  };
+
+  /* ---------- Guardado en el dispositivo ----------
+     Los registros quedan solo en este teléfono (no se envían a ningún servidor). */
+  const LS_VIS = "tagangaOne.visitantes", LS_ACT = "tagangaOne.actual";
+  const guardar = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
+  const leer = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (_) { return d; } };
+  state.visitantes = leer(LS_VIS, []);
+
+  /* =======================================================
+     1. PANTALLA DE REGISTRO / INGRESO
+     ======================================================= */
+  const form = $("#auth-form");
+  const consentBox = $("#consent-box");
+  const consent = $("#f-consent");
+
+  // Fecha de visita por defecto: hoy
+  const hoy = new Date();
+  const iso = new Date(hoy.getTime() - hoy.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  $("#f-fecha").value = iso;
+  $("#f-fecha").min = iso;
+
+  // Cambiar entre "Registrarme" y "Ya me registré"
+  $$(".segmented button").forEach(btn => {
+    btn.addEventListener("click", () => setMode(btn.dataset.mode));
+  });
+
+  function setMode(mode) {
+    state.mode = mode;
+    $$(".segmented button").forEach(b => b.setAttribute("aria-selected", b.dataset.mode === mode));
+    $$(".only-registro").forEach(el => el.classList.toggle("hidden", mode !== "registro"));
+    $("#submit-label").textContent = mode === "registro" ? "Registrarme e ingresar" : "Ingresar";
+    $$(".field.invalid").forEach(f => f.classList.remove("invalid"));
+    consentBox.classList.remove("invalid");
+  }
+
+  // Validación de un campo
+  function check(id, ok) {
+    const field = $("#" + id).closest(".field");
+    field.classList.toggle("invalid", !ok);
+    return ok;
+  }
+
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    const doc = $("#f-doc").value.trim();
+    const tipodoc = $("#f-tipodoc").value;
+    const docOk = tipodoc === "PA" ? /^[A-Za-z0-9]{5,12}$/.test(doc) : /^\d{5,12}$/.test(doc);
+
+    if (state.mode === "ingreso") {
+      if (!check("f-doc", docOk)) return focusFirstError();
+      const v = state.visitantes.find(x => x.doc === doc && x.tipodoc === tipodoc);
+      if (v) return entrar(v);
+      // Sin servidor: solo se buscan los registros hechos en este dispositivo
+      toast("No encontramos ese documento en este dispositivo. Completa tu registro.");
+      setMode("registro");
+      $("#tab-registro").focus();
+      return;
+    }
+
+    // Modo registro: validar todo
+    const nombre = $("#f-nombre").value.trim();
+    const correo = $("#f-correo").value.trim();
+    const grupo = parseInt($("#f-grupo").value, 10);
+    let ok = true;
+    ok = check("f-nombre", nombre.split(/\s+/).length >= 2 && nombre.length >= 5) && ok;
+    ok = check("f-doc", docOk) && ok;
+    ok = check("f-procedencia", $("#f-procedencia").value.trim().length >= 2) && ok;
+    ok = check("f-grupo", grupo >= 1 && grupo <= 50) && ok;
+    ok = check("f-correo", /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correo)) && ok;
+    ok = check("f-fecha", !!$("#f-fecha").value) && ok;
+
+    // Autorización Ley 1581 obligatoria
+    consentBox.classList.toggle("invalid", !consent.checked);
+    ok = consent.checked && ok;
+
+    if (!ok) return focusFirstError();
+
+    const visitante = {
+      codigo: "TG-" + Math.floor(1000 + Math.random() * 9000),
+      nombre, tipodoc, doc, correo, grupo,
+      procedencia: $("#f-procedencia").value.trim(),
+      fecha: $("#f-fecha").value,
+      motivo: $("#f-motivo").value,
+      autorizacionDatos: { aceptada: true, norma: "Ley 1581 de 2012 / Decreto 1377 de 2013", fecha: new Date().toISOString() }
+    };
+    // Si el documento ya existía, se reemplaza por el registro nuevo
+    state.visitantes = state.visitantes.filter(x => !(x.doc === doc && x.tipodoc === tipodoc));
+    state.visitantes.push(visitante);
+    guardar(LS_VIS, state.visitantes);
+    entrar(visitante);
+  });
+
+  consent.addEventListener("change", () => { if (consent.checked) consentBox.classList.remove("invalid"); });
+  $$("#auth-form input").forEach(i => i.addEventListener("input", () => i.closest(".field")?.classList.remove("invalid")));
+
+  function focusFirstError() {
+    const bad = $(".field.invalid input, .field.invalid select") || (consentBox.classList.contains("invalid") ? consent : null);
+    if (bad) { bad.focus(); bad.scrollIntoView({ behavior: "smooth", block: "center" }); }
+  }
+
+  // Aviso de privacidad
+  const modal = $("#privacy-modal");
+  $("#open-privacy").addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); modal.classList.remove("hidden"); });
+  $("#close-privacy").addEventListener("click", () => modal.classList.add("hidden"));
+  $("#accept-privacy").addEventListener("click", () => {
+    consent.checked = true; consentBox.classList.remove("invalid"); modal.classList.add("hidden");
+  });
+  modal.addEventListener("click", e => { if (e.target === modal) modal.classList.add("hidden"); });
+
+  /* ---------- Cambio de pantalla ---------- */
+  function entrar(v) {
+    state.actual = v;
+    guardar(LS_ACT, { doc: v.doc, tipodoc: v.tipodoc });
+    $("#screen-auth").classList.add("hidden");
+    $("#screen-main").classList.remove("hidden");
+    irArriba();
+
+    const primerNombre = v.nombre.split(" ")[0];
+    $("#welcome-title").textContent = `¡Bienvenido, ${primerNombre}!`;
+    $("#topbar-user").textContent = `${v.nombre} · ${v.grupo} persona${v.grupo > 1 ? "s" : ""}`;
+    $("#visitor-code").textContent = v.codigo;
+
+    mostrarModulo("mod-mapa");   // el mapa es el módulo inicial
+    initMapa();
+    // Leaflet necesita recalcular tamaño cuando el contenedor pasa de oculto a visible
+    setTimeout(() => state.map && state.map.invalidateSize(), 100);
+    initChat(primerNombre);
+  }
+
+  $("#logout-btn").addEventListener("click", () => {
+    state.actual = null;
+    guardar(LS_ACT, null);
+    $("#screen-main").classList.add("hidden");
+    $("#screen-auth").classList.remove("hidden");
+    form.reset();
+    $("#f-fecha").value = iso;
+    setMode("ingreso");
+    irArriba();
+    toast("Sesión cerrada. Puedes volver a ingresar con tu documento.");
+  });
+
+  /* =======================================================
+     2. MAPA DE LOCACIONES (Leaflet + polígonos referenciales)
+     ======================================================= */
+  const ESTILOS = {
+    libre:     { color: "#004A87", fillColor: "#004A87", fillOpacity: .22, weight: 2.5, label: "Libre tránsito turístico" },
+    sagrado:   { color: "#D17900", fillColor: "#D17900", fillOpacity: .30, weight: 2.5, label: "Sitio sagrado / religioso" },
+    ecologico: { color: "#005C06", fillColor: "#005C06", fillOpacity: .25, weight: 2.5, label: "Protección ecológica" },
+    pesca:     { color: "#A3231B", fillColor: "#A3231B", fillOpacity: .18, weight: 2.5, dashArray: "6 6", label: "Reserva de pesca artesanal" }
+  };
+
+  // Coordenadas aproximadas (referenciales) de la bahía de Taganga
+  const ZONAS = [
+    { tipo: "libre", nombre: "Playa y malecón de Taganga",
+      desc: "Zona principal de llegada, comercio local y baño.",
+      regla: "Permitido: baño, recorridos y comercio local. Respeta las lanchas varadas y las faenas de pesca.",
+      coords: [[11.2692,-74.1918],[11.2690,-74.1898],[11.2660,-74.1893],[11.2648,-74.1905],[11.2662,-74.1920]] },
+    { tipo: "libre", nombre: "Playa Grande",
+      desc: "Playa turística accesible por sendero o lancha.",
+      regla: "Permitido: baño y descanso. Llévate tus residuos; no hay recolección en la playa.",
+      coords: [[11.2618,-74.2005],[11.2612,-74.1982],[11.2590,-74.1975],[11.2584,-74.1996],[11.2600,-74.2010]] },
+    { tipo: "libre", nombre: "Sendero Taganga – Playa Grande",
+      desc: "Camino peatonal costero.",
+      regla: "Transita solo por el sendero marcado. No abras caminos nuevos en el cerro.",
+      line: [[11.2650,-74.1915],[11.2640,-74.1935],[11.2628,-74.1955],[11.2615,-74.1980]] },
+    { tipo: "sagrado", nombre: "Cerro tutelar (sitio ancestral)",
+      desc: "Lugar de pagamento y memoria de los Hermanos Mayores.",
+      regla: "Acceso restringido. Solo con autorización y acompañamiento de la autoridad ancestral. Prohibido extraer piedras o vegetación.",
+      coords: [[11.2735,-74.1940],[11.2745,-74.1905],[11.2720,-74.1885],[11.2705,-74.1915],[11.2712,-74.1940]] },
+    { tipo: "sagrado", nombre: "Capilla de San Pedro (religioso)",
+      desc: "Templo del patrono de los pescadores.",
+      regla: "Visita en silencio y con vestimenta adecuada. No interrumpas celebraciones.",
+      point: [11.2672, -74.1882] },
+    { tipo: "sagrado", nombre: "Punta de los ancestros",
+      desc: "Promontorio rocoso de valor espiritual.",
+      regla: "No acampar, no hacer fogatas, no dejar ofrendas ajenas a la tradición local.",
+      coords: [[11.2720,-74.2010],[11.2728,-74.1985],[11.2710,-74.1975],[11.2700,-74.1998]] },
+    { tipo: "ecologico", nombre: "Bosque seco tropical (cerros)",
+      desc: "Ecosistema frágil con fauna endémica.",
+      regla: "Prohibido talar, cazar, encender fuego o alimentar fauna. Ingreso solo con guía local.",
+      coords: [[11.2650,-74.1885],[11.2660,-74.1860],[11.2620,-74.1855],[11.2595,-74.1900],[11.2612,-74.1925],[11.2635,-74.1905]] },
+    { tipo: "ecologico", nombre: "Arrecife y pradera marina",
+      desc: "Zona de corales y pastos marinos.",
+      regla: "Snorkel y buceo solo con operador registrado. No pisar ni tocar corales. Usa protector solar biodegradable.",
+      coords: [[11.2632,-74.2030],[11.2640,-74.2005],[11.2622,-74.1998],[11.2612,-74.2022]] },
+    { tipo: "pesca", nombre: "Reserva de pesca artesanal (bahía norte)",
+      desc: "Área de calado de redes y chinchorro de la comunidad.",
+      regla: "Prohibido el paso de motos acuáticas, lanchas recreativas y bañistas. No manipular redes ni boyas.",
+      coords: [[11.2712,-74.1975],[11.2715,-74.1935],[11.2695,-74.1925],[11.2680,-74.1950],[11.2690,-74.1975]] },
+    { tipo: "pesca", nombre: "Caladero tradicional (bahía sur)",
+      desc: "Zona de pesca de línea y nasa.",
+      regla: "Mantén distancia de 50 m de las embarcaciones de pesca. No anclar.",
+      coords: [[11.2650,-74.1965],[11.2655,-74.1935],[11.2638,-74.1940],[11.2630,-74.1962]] }
+  ];
+
+  function initMapa() {
+    if (state.map) return;
+    if (typeof L === "undefined") {
+      $("#map").outerHTML = '<div class="map-fallback">No se pudo cargar el mapa (se necesita conexión a Internet para las teselas).<br>Las zonas y normas siguen disponibles en el Asistente y el Decálogo.</div>';
+      return;
+    }
+    const map = L.map("map", { zoomControl: true, scrollWheelZoom: false, tap: true }).setView([11.2665, -74.1940], 15);
+    state.map = map;
+    // Teselas Esri World Street Map: públicas, sin API key ni registro.
+    // Nota: Esri usa el orden {z}/{y}/{x} (fila antes que columna).
+    const esri = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 19,
+      attribution: "Tiles &copy; Esri &mdash; Esri, HERE, Garmin, USGS, OpenStreetMap contributors"
+    }).addTo(map);
+
+    // Respaldo automático (también sin clave) si Esri falla varias veces
+    let fallos = 0;
+    esri.on("tileerror", () => {
+      if (++fallos !== 6) return;
+      map.removeLayer(esri);
+      L.tileLayer("https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png", {
+        subdomains: "abc", maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · OSM France'
+      }).addTo(map).bringToBack();
+    });
+
+    Object.keys(ESTILOS).forEach(k => state.capas[k] = L.layerGroup().addTo(map));
+
+    ZONAS.forEach(z => {
+      const st = ESTILOS[z.tipo];
+      let capa;
+      if (z.coords) capa = L.polygon(z.coords, st);
+      else if (z.line) capa = L.polyline(z.line, { color: st.color, weight: 4, dashArray: "2 8", lineCap: "round" });
+      else capa = L.circleMarker(z.point, { radius: 10, color: "#fff", weight: 3, fillColor: st.color, fillOpacity: 1 });
+
+      capa.bindPopup(
+        `<span class="pop-tag" style="background:${st.color}">${st.label}</span>
+         <div class="pop-title">${z.nombre}</div>
+         <div class="pop-rule">${z.regla}</div>`
+      );
+      capa.on("click", () => mostrarInfo(z));
+      capa.addTo(state.capas[z.tipo]);
+    });
+  }
+
+  function mostrarInfo(z) {
+    const st = ESTILOS[z.tipo];
+    const box = $("#site-info");
+    box.style.borderLeftColor = st.color;
+    box.innerHTML = `<span class="tag" style="background:${st.color}">${st.label}</span>
+      <b>${z.nombre}</b>${z.desc}<br><strong>Norma:</strong> ${z.regla}`;
+  }
+
+  // Filtros de capas
+  $$(".chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const on = chip.getAttribute("aria-pressed") !== "true";
+      chip.setAttribute("aria-pressed", on);
+      const capa = state.capas[chip.dataset.layer];
+      if (!state.map || !capa) return;
+      on ? capa.addTo(state.map) : state.map.removeLayer(capa);
+    });
+  });
+
+  /* =======================================================
+     3. DECÁLOGO
+     ======================================================= */
+  const DECALOGO = [
+    ["Regístrate", "antes de ingresar y porta tu código de visitante."],
+    ["Respeta los sitios sagrados:", "no ingreses sin autorización de la autoridad ancestral."],
+    ["No interfieras la pesca artesanal:", "no nades, navegues ni anclas en las zonas de reserva."],
+    ["No toques ni extraigas", "corales, conchas, piedras, plantas o animales."],
+    ["Llévate tu basura", "de vuelta; evita plásticos de un solo uso."],
+    ["Usa protector solar biodegradable", "para cuidar el arrecife."],
+    ["No hagas fogatas", "ni acampes en cerros, puntas o playas no habilitadas."],
+    ["Transita solo por senderos", "señalizados y con guías locales registrados."],
+    ["Respeta la cultura local:", "pide permiso antes de fotografiar personas y ceremonias."],
+    ["Consume local y con moderación:", "el ruido excesivo y el alcohol en la playa afectan a la comunidad."]
+  ];
+  $("#decalogo-list").innerHTML = DECALOGO.map(([b, t]) => `<li><span><b>${b}</b> ${t}</span></li>`).join("");
+
+  /* =======================================================
+     4. ASISTENTE VIRTUAL (IA simulada)
+     ======================================================= */
+  const BASE = [
+    { id: "sagrados", pregunta: "¿Cuáles son los sitios sagrados de Taganga?",
+      claves: ["sagrad", "sitio", "cerro", "ancestr", "capilla", "templo", "religio", "pagamento"],
+      respuesta: `<p>En el mapa están señalados en <b style="color:#D17900">dorado</b>. Los principales son:</p>
+        <ul><li><b>Cerro tutelar:</b> lugar de pagamento y memoria de los Hermanos Mayores. Solo se entra con autorización.</li>
+        <li><b>Capilla de San Pedro:</b> templo del patrono de los pescadores.</li>
+        <li><b>Punta de los ancestros:</b> promontorio rocoso de valor espiritual.</li></ul>
+        <p>En todos ellos: silencio, no extraer elementos naturales y no dejar ofrendas ajenas a la tradición.</p>` },
+    { id: "ambiente", pregunta: "¿Cuáles son las normas de protección ambiental?",
+      claves: ["ambient", "norma", "regla", "proteg", "basura", "coral", "arrecife", "fauna", "bosque", "residuo", "plastic"],
+      respuesta: `<p>Las normas clave son:</p>
+        <ul><li>No tocar ni extraer corales, conchas, plantas o animales.</li>
+        <li>Llevarte tus residuos; evita plásticos de un solo uso.</li>
+        <li>Usar protector solar biodegradable.</li>
+        <li>Nada de fogatas ni tala en el bosque seco tropical.</li>
+        <li>Buceo y snorkel solo con operadores registrados.</li></ul>
+        <p>Puedes verlas completas en el <b>Decálogo</b>.</p>` },
+    { id: "historia", pregunta: "¿Cuál es la historia comunitaria?",
+      claves: ["histor", "origen", "comunidad", "pueblo", "tayrona", "cultura", "tradic", "fundac"],
+      respuesta: `<p>Taganga es uno de los asentamientos más antiguos del Caribe colombiano. Su población reconoce raíces en los pueblos <b>tayrona</b> de la Sierra Nevada, y su vida ha girado por siglos en torno a la <b>pesca artesanal</b> y la relación espiritual con el mar y los cerros.</p>
+        <p>Con el crecimiento del turismo, la comunidad y sus autoridades ancestrales buscan ordenar las visitas para proteger el territorio. Taganga One nace en ese propósito.</p>` },
+    { id: "pesca", pregunta: "¿Qué son las zonas de reserva pesquera artesanal?",
+      claves: ["pesca", "pescad", "red", "chinchorro", "lancha", "moto acu", "jet", "bahía", "bahia", "navega"],
+      respuesta: `<p>Son áreas de la bahía (en <b style="color:#A3231B">rojo punteado</b> en el mapa) donde la comunidad cala redes y pesca de forma tradicional.</p>
+        <ul><li>Prohibido el paso de motos acuáticas y lanchas recreativas.</li>
+        <li>No nadar ni anclar dentro de la zona.</li>
+        <li>Mantén 50 m de distancia de las embarcaciones de pesca.</li>
+        <li>No manipules redes, boyas ni nasas.</li></ul>` },
+    { id: "datos", pregunta: "¿Cómo se usan mis datos personales?",
+      claves: ["dato", "privacidad", "habeas", "1581", "informaci", "registro", "borrar", "suprim"],
+      respuesta: `<p>Tus datos se tratan conforme a la <b>Ley 1581 de 2012</b> y el Decreto 1377 de 2013, solo para el control de visitantes por la comunidad y las autoridades ancestrales.</p>
+        <p>Puedes conocer, actualizar, rectificar o pedir la supresión de tus datos en cualquier momento. <b>No se venden ni se ceden</b> a empresas privadas y no hay rastreo GPS.</p>` },
+    { id: "llegar", pregunta: "¿Cómo llego a Playa Grande?",
+      claves: ["llegar", "playa grande", "sendero", "camin", "ruta", "como voy", "cómo voy"],
+      respuesta: `<p>Hay dos formas:</p>
+        <ul><li><b>A pie:</b> por el sendero costero que sale del extremo sur del malecón (unos 20–30 min). Ve con agua, calzado cerrado y no salgas del camino.</li>
+        <li><b>En lancha:</b> desde la playa principal, con lancheros locales.</li></ul>
+        <p>Está marcada en <b style="color:#004A87">azul</b> en el mapa como zona de libre tránsito.</p>` }
+  ];
+
+  const RESPUESTAS_EXTRA = [
+    { claves: ["hola", "buenas", "buenos", "hey", "saludo"], r: n => `<p>¡Hola${n ? ", " + n : ""}! 👋 Soy el asistente de Taganga One. Pregúntame por sitios sagrados, normas ambientales, pesca artesanal o la historia de la comunidad.</p>` },
+    { claves: ["gracias", "graciass", "thank"], r: () => `<p>¡Con gusto! Disfruta Taganga con respeto. 🌊</p>` },
+    { claves: ["foto", "fotograf", "dron"], r: () => `<p>Puedes tomar fotos en zonas de libre tránsito. Pide permiso antes de fotografiar personas o ceremonias, y no vueles drones sobre sitios sagrados ni zonas de pesca sin autorización comunitaria.</p>` },
+    { claves: ["guía", "guia", "tour", "operador", "buceo", "snorkel"], r: () => `<p>Contrata guías y operadores de buceo <b>locales y registrados</b> ante la comunidad. Así tu visita beneficia directamente a Taganga y se respetan las zonas protegidas.</p>` },
+    { claves: ["emergencia", "ayuda", "policía", "policia", "accidente", "herido"], r: () => `<p>En caso de emergencia llama a la <b>línea 123</b>. También puedes acudir a la autoridad comunitaria en la playa principal.</p>` },
+    { claves: ["cobro", "pagar", "precio", "tarifa", "cuesta", "peaje"], r: () => `<p>Taganga One <b>no cobra</b> por el registro ni realiza recaudos de peaje. Es una herramienta de sensibilización y control territorial.</p>` },
+    { claves: ["acampar", "camping", "fogata", "carpa"], r: () => `<p>No está permitido acampar ni hacer fogatas en cerros, puntas o playas no habilitadas. Consulta hospedajes locales en el pueblo.</p>` }
+  ];
+
+  const chatLog = $("#chat-log");
+  const chatInput = $("#chat-input");
+  let chatIniciado = false;
+  let ocupado = false;
+
+  function initChat(nombre) {
+    if (chatIniciado) return;
+    chatIniciado = true;
+    $("#suggestions").innerHTML = BASE.map(b => `<button type="button" data-id="${b.id}">${b.pregunta}</button>`).join("");
+    $$("#suggestions button").forEach(btn => btn.addEventListener("click", () => {
+      const item = BASE.find(b => b.id === btn.dataset.id);
+      preguntar(item.pregunta, item.respuesta);
+    }));
+    agregarBot(`<p>¡Hola, ${nombre}! Soy <b>Taganga One</b>, tu asistente virtual. 🌿</p>
+      <p>Toca una pregunta frecuente o escríbeme lo que quieras saber sobre el territorio.</p>`);
+  }
+
+  function agregarUsuario(texto) {
+    const div = document.createElement("div");
+    div.className = "msg msg-user";
+    div.textContent = texto;            // textContent evita inyección de HTML
+    chatLog.appendChild(div);
+    scrollChat();
+  }
+
+  function agregarBot(html) {
+    const div = document.createElement("div");
+    div.className = "msg msg-bot";
+    div.innerHTML = `<div class="who">● Taganga One</div>${html}`;
+    chatLog.appendChild(div);
+    scrollChat();
+  }
+
+  function mostrarEscribiendo() {
+    const div = document.createElement("div");
+    div.className = "msg msg-bot typing";
+    div.id = "typing";
+    div.setAttribute("aria-label", "El asistente está escribiendo");
+    div.innerHTML = "<span></span><span></span><span></span>";
+    chatLog.appendChild(div);
+    scrollChat();
+  }
+
+  function scrollChat() { chatLog.scrollTop = chatLog.scrollHeight; }
+
+  function preguntar(texto, respuestaFija) {
+    if (ocupado) return;
+    ocupado = true;
+    $("#send-btn").disabled = true;
+    agregarUsuario(texto);
+    mostrarEscribiendo();
+    const respuesta = respuestaFija || responder(texto);
+    const espera = 600 + Math.min(1200, respuesta.length * 2); // simula "pensar"
+    setTimeout(() => {
+      $("#typing")?.remove();
+      agregarBot(respuesta);
+      ocupado = false;
+      $("#send-btn").disabled = false;
+    }, espera);
+  }
+
+  // Motor de respuesta simulado: coincidencia por palabras clave
+  function normalizar(t) {
+    return t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  }
+  function responder(texto) {
+    const t = normalizar(texto);
+    const nombre = state.actual ? state.actual.nombre.split(" ")[0] : "";
+
+    let mejor = null, puntos = 0;
+    BASE.forEach(b => {
+      const p = b.claves.filter(c => t.includes(normalizar(c))).length;
+      if (p > puntos) { puntos = p; mejor = b.respuesta; }
+    });
+    if (mejor) return mejor;
+
+    for (const e of RESPUESTAS_EXTRA) {
+      if (e.claves.some(c => t.includes(normalizar(c)))) return e.r(nombre);
+    }
+    return `<p>Aún no tengo información precisa sobre eso. Puedo ayudarte con:</p>
+      <ul><li>Sitios sagrados y religiosos</li><li>Normas de protección ambiental</li>
+      <li>Zonas de pesca artesanal</li><li>Historia comunitaria</li><li>Tus datos personales</li></ul>
+      <p>También puedes consultar a la autoridad comunitaria en la playa principal.</p>`;
+  }
+
+  $("#chat-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const texto = chatInput.value.trim();
+    if (!texto || ocupado) return;
+    chatInput.value = "";
+    preguntar(texto);
+  });
+
+  /* =======================================================
+     5. NAVEGACIÓN INFERIOR Y UTILIDADES
+     ======================================================= */
+  // Muestra solo el módulo elegido y oculta los demás (Single Page Application)
+  function mostrarModulo(id) {
+    $$(".module").forEach(m => m.classList.toggle("hidden", m.id !== id));
+    $$(".bottom-nav button").forEach(b => {
+      const activo = b.dataset.module === id;
+      b.classList.toggle("active", activo);
+      b.setAttribute("aria-selected", activo);
+    });
+    irArriba();
+    // Leaflet debe recalcular su tamaño al volver a ser visible
+    if (id === "mod-mapa" && state.map) setTimeout(() => state.map.invalidateSize(), 50);
+    if (id === "mod-asistente") setTimeout(scrollChat, 50);
+  }
+  state.mostrarModulo = mostrarModulo;
+
+  $$(".bottom-nav button").forEach(btn => {
+    btn.addEventListener("click", () => mostrarModulo(btn.dataset.module));
+  });
+
+  let toastTimer;
+  function toast(msg) {
+    $(".toast")?.remove();
+    const t = document.createElement("div");
+    t.className = "toast"; t.role = "status"; t.textContent = msg;
+    document.body.appendChild(t);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.remove(), 3200);
+  }
+
+  /* =======================================================
+     APLICACIÓN WEB: sesión guardada, instalación y sin conexión
+     ======================================================= */
+  // Reabrir la sesión del último visitante
+  const ult = leer(LS_ACT, null);
+  const vUlt = ult && state.visitantes.find(x => x.doc === ult.doc && x.tipodoc === ult.tipodoc);
+  if (vUlt) entrar(vUlt);
+
+  // Service worker (funciona al publicar la app en un sitio https)
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
+
+  // Aviso de instalación
+  const bar = $("#install-bar"), instBtn = $("#install-btn");
+  const yaInstalada = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const descartado = leer("tagangaOne.sinAviso", false);
+  const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+                (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  let promptInst = null;
+
+  window.addEventListener("beforeinstallprompt", e => {
+    e.preventDefault(); promptInst = e;
+    if (!yaInstalada && !descartado) bar.classList.remove("hidden");
+  });
+  if (esIOS && !yaInstalada && !descartado) {
+    $("#install-hint").textContent = "En Safari toca Compartir y luego «Agregar a inicio».";
+    instBtn.classList.add("hidden");
+    bar.classList.remove("hidden");
+  }
+  instBtn.addEventListener("click", async () => {
+    if (!promptInst) return;
+    promptInst.prompt();
+    await promptInst.userChoice.catch(() => {});
+    promptInst = null; bar.classList.add("hidden");
+  });
+  $("#install-close").addEventListener("click", () => { bar.classList.add("hidden"); guardar("tagangaOne.sinAviso", true); });
+  window.addEventListener("appinstalled", () => { bar.classList.add("hidden"); toast("Taganga One quedó instalada en tu teléfono."); });
+
+  // Indicador sin conexión
+  function estadoRed() {
+    $(".offline-pill")?.remove();
+    if (navigator.onLine) return;
+    const p = document.createElement("div");
+    p.className = "offline-pill"; p.role = "status";
+    p.textContent = "Sin conexión · el mapa muestra solo lo ya visto";
+    document.body.appendChild(p);
+  }
+  window.addEventListener("online", estadoRed);
+  window.addEventListener("offline", estadoRed);
+  estadoRed();
+})();
+</script>
+</body>
+</html>
