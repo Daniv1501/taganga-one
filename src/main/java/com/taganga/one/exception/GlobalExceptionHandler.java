@@ -38,6 +38,14 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, ex.getMessage(), Map.of());
     }
 
+    // 401 — correo o contraseña incorrectos
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidCredentials(
+            InvalidCredentialsException ex) {
+
+        return build(HttpStatus.UNAUTHORIZED, ex.getMessage(), Map.of());
+    }
+
     // 409 — regla de negocio violada
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ErrorResponse> handleBusinessRule(
@@ -46,7 +54,7 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, ex.getMessage(), Map.of());
     }
 
-    // 409 — dos registros simultáneos con el mismo documento chocan con el UNIQUE
+    // 409 — dos registros simultáneos con el mismo correo chocan con el UNIQUE
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrity(
             DataIntegrityViolationException ex) {

@@ -1,26 +1,17 @@
 package com.taganga.one.dto.request;
 
-import com.taganga.one.domain.DocumentType;
-
-import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 public record VisitorLoginRequest(
 
-        @NotNull(message = "Elige el tipo de documento.")
-        DocumentType documentType,
+        @NotBlank(message = "Escribe tu correo.")
+        @Size(max = 254, message = "Escribe un correo válido.")
+        String email,
 
-        @NotBlank(message = "Documento no válido.")
-        String documentNumber
+        @NotBlank(message = "Escribe tu contraseña.")
+        @Size(max = 72, message = "Contraseña no válida.")
+        String password
 
 ) {
-
-    @AssertTrue(message = "Documento no válido.")
-    public boolean isDocumentNumberValid() {
-        return documentType == null
-                || documentNumber == null
-                || documentNumber.isBlank()
-                || documentType.accepts(documentNumber.trim());
-    }
 }

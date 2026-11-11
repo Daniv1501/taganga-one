@@ -1,6 +1,5 @@
 package com.taganga.one.repository;
 
-import com.taganga.one.domain.DocumentType;
 import com.taganga.one.domain.Visitor;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,8 +9,7 @@ import java.util.Optional;
 
 public interface VisitorRepository extends JpaRepository<Visitor, Long> {
 
-    Optional<Visitor> findByDocumentTypeAndDocumentNumber(
-            DocumentType documentType, String documentNumber);
+    Optional<Visitor> findByEmail(String email);
 
     Optional<Visitor> findByVisitorCode(String visitorCode);
 

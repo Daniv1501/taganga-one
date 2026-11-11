@@ -5,7 +5,7 @@ import com.taganga.one.domain.VisitReason;
 import java.time.LocalDate;
 
 /**
- * Solo lo que la app necesita mostrar: el correo y el número de documento
+ * Solo lo que la app necesita mostrar: el correo y la contraseña
  * nunca salen del servidor.
  */
 public record VisitorResponse(

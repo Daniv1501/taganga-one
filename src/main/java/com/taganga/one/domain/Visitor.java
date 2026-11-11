@@ -31,15 +31,11 @@ public class Visitor {
     @Column(name = "full_name", nullable = false, length = 150)
     private String fullName;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "document_type", nullable = false, length = 5)
-    private DocumentType documentType;
-
-    @Column(name = "document_number", nullable = false, length = 12)
-    private String documentNumber;
-
-    @Column(nullable = false, length = 254)
+    @Column(nullable = false, unique = true, length = 254)
     private String email;
+
+    @Column(name = "password_hash", nullable = false, length = 60)
+    private String passwordHash;
 
     @Column(nullable = false, length = 120)
     private String origin;
@@ -60,27 +56,24 @@ public class Visitor {
     protected Visitor() {
     }
 
-    public Visitor(String visitorCode, String fullName, DocumentType documentType,
-            String documentNumber, String email, String origin, int groupSize,
-            LocalDate visitDate, VisitReason reason) {
+    public Visitor(String visitorCode, String fullName, String email, String passwordHash,
+            String origin, int groupSize, LocalDate visitDate, VisitReason reason) {
         this.visitorCode = visitorCode;
         this.fullName = fullName;
-        this.documentType = documentType;
-        this.documentNumber = documentNumber;
         this.email = email;
+        this.passwordHash = passwordHash;
         this.origin = origin;
         this.groupSize = groupSize;
         this.visitDate = visitDate;
         this.reason = reason;
     }
 
-    // Igual que en el prototipo: si el documento ya existía, el registro nuevo
-    // reemplaza al anterior y el visitante recibe un código nuevo.
-    public void replaceRegistration(String visitorCode, String fullName, String email,
+    // Si el correo ya estaba registrado (y la contraseña coincide), el registro
+    // nuevo reemplaza al anterior y el visitante recibe un código nuevo.
+    public void replaceRegistration(String visitorCode, String fullName,
             String origin, int groupSize, LocalDate visitDate, VisitReason reason) {
         this.visitorCode = visitorCode;
         this.fullName = fullName;
-        this.email = email;
         this.origin = origin;
         this.groupSize = groupSize;
         this.visitDate = visitDate;
@@ -103,16 +96,12 @@ public class Visitor {
         return fullName;
     }
 
-    public DocumentType getDocumentType() {
-        return documentType;
-    }
-
-    public String getDocumentNumber() {
-        return documentNumber;
-    }
-
     public String getEmail() {
         return email;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
     }
 
     public String getOrigin() {

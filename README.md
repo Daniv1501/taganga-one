@@ -24,7 +24,7 @@ El asistente es **simulado**: responde por coincidencia de palabras clave, sin I
 
 | Entidad | Tabla | Descripción |
 |---|---|---|
-| `Visitor` | `visitors` | Visitante registrado (código, nombre, documento, correo, procedencia, personas, fecha, motivo) |
+| `Visitor` | `visitors` | Visitante registrado (código, nombre, correo, hash de la contraseña, procedencia, personas, fecha, motivo) |
 | `DataConsent` | `data_consents` | Prueba de cada autorización de datos aceptada (norma, fecha y hora) |
 | `Zone` | `zones` | Zona del mapa (tipo, nombre, descripción, norma, geometría) |
 | `GeoPoint` | `zone_coordinates` | Coordenadas ordenadas de una zona (`@Embeddable`) |
@@ -33,7 +33,6 @@ El asistente es **simulado**: responde por coincidencia de palabras clave, sin I
 
 Enumerados (persistidos como `VARCHAR` vía `@Enumerated(EnumType.STRING)`):
 
-- `DocumentType`: `CC`, `CE`, `TI`, `PA`
 - `VisitReason`: `TOURISM`, `DIVING_SNORKELING`, `ACADEMIC`, `FAMILY_VISIT`, `OTHER`
 - `ZoneType`: `FREE_TRANSIT`, `SACRED`, `ECOLOGICAL`, `ARTISANAL_FISHING`
 - `ZoneGeometry`: `POLYGON`, `LINE`, `POINT`
@@ -63,7 +62,7 @@ Los errores usan siempre el mismo contrato (`ErrorResponse`): `timestamp`, `stat
 | Método | Ruta | Descripción | Respuestas |
 |---|---|---|---|
 | `POST` | `/api/visitors` | Registrar visitante | `201`, `400`, `409` |
-| `POST` | `/api/visitors/login` | Ingresar con tipo y número de documento | `200`, `400`, `404` |
+| `POST` | `/api/visitors/login` | Ingresar con correo y contraseña | `200`, `400`, `401` |
 | `GET` | `/api/zones` | Zonas del mapa con sus coordenadas | `200` |
 | `GET` | `/api/decalogue` | Reglas del decálogo en orden | `200` |
 | `GET` | `/api/assistant/faqs` | Preguntas frecuentes con su respuesta | `200` |
@@ -72,13 +71,17 @@ Los errores usan siempre el mismo contrato (`ErrorResponse`): `timestamp`, `stat
 **Reglas de negocio**
 
 1. La fecha de visita no puede ser anterior a hoy, según la hora de Colombia (`409`).
-2. Un documento tiene un solo registro: registrarlo de nuevo reemplaza los datos y genera un
-   código nuevo.
+2. Un correo tiene un solo registro. Registrarlo de nuevo con la **misma contraseña** reemplaza
+   los datos y genera un código nuevo; con otra contraseña se rechaza (`409`).
 3. Cada registro agrega una fila en `data_consents`, así que el historial de autorizaciones
    se conserva aunque se reemplacen los datos.
 4. Sin autorización de datos no hay registro (`400`).
+5. La contraseña tiene entre 8 y 72 caracteres (máximo 72 bytes, el límite de BCrypt) y se
+   guarda solo como hash BCrypt. El correo se guarda en minúsculas.
+6. Si el correo o la contraseña no coinciden, el ingreso responde `401` con el mismo mensaje
+   en ambos casos, para no revelar qué correos están registrados.
 
-`VisitorResponse` nunca devuelve el correo ni el número de documento.
+`VisitorResponse` nunca devuelve el correo ni la contraseña.
 
 ## 6. Instrucciones para ejecutar la aplicación
 
@@ -132,6 +135,7 @@ al arrancar solo comprueba que las entidades coincidan con las tablas.
 | `V2__insert_zones.sql` | Las 10 zonas del mapa y sus 43 coordenadas |
 | `V3__insert_decalogue.sql` | Las 10 reglas del decálogo |
 | `V4__insert_assistant_knowledge.sql` | 6 preguntas frecuentes, 7 respuestas adicionales y 85 palabras clave |
+| `V5__email_password_login.sql` | Quita el documento, agrega `password_hash` y vuelve único el correo. **Borra los visitantes anteriores**, que no tenían contraseña |
 
 ## 9. Diferencias con el prototipo
 
@@ -150,11 +154,11 @@ al arrancar solo comprueba que las entidades coincidan con las tablas.
 
 Antes de usarlo con visitantes reales hay que resolver lo siguiente:
 
-- **El ingreso no tiene contraseña.** Con un tipo y número de documento ajenos cualquiera
-  puede ver el nombre, el código y el tamaño del grupo de esa persona, y registrarse de nuevo
-  reemplaza sus datos. En el prototipo no pasaba porque cada teléfono solo veía sus propios
-  registros.
-- **No hay autenticación ni límite de intentos** en la API, igual que en DeepBlue Rescue.
+- **No se verifica el correo**: cualquiera puede registrarse con un correo ajeno que aún no esté
+  registrado.
+- **No hay recuperación de contraseña.**
+- **No hay sesión en el servidor ni límite de intentos** de ingreso: la API no emite token y
+  la sesión solo se recuerda en el navegador.
 - **Faltan los derechos del titular** que promete el aviso: la app no permite consultar,
   rectificar ni suprimir datos, ni revocar la autorización.
 - **Los polígonos del mapa son referenciales** y deben validarse con la comunidad y las
