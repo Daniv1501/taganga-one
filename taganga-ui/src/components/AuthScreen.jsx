@@ -19,8 +19,11 @@ function todayIso() {
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
 }
 
-function isDocumentValid(type, number) {
-  return type === 'PA' ? /^[A-Za-z0-9]{5,12}$/.test(number) : /^\d{5,12}$/.test(number)
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+
+// BCrypt cuenta bytes: una tilde o una ñ ocupan dos
+function isPasswordValid(password) {
+  return password.length >= 8 && new TextEncoder().encode(password).length <= 72
 }
 
 // Mismas reglas del prototipo; el backend las vuelve a validar
@@ -30,10 +33,11 @@ function validateRegistration(form) {
   const invalid = new Set()
 
   if (!(name.split(/\s+/).length >= 2 && name.length >= 5)) invalid.add('fullName')
-  if (!isDocumentValid(form.documentType, form.documentNumber.trim())) invalid.add('documentNumber')
   if (form.origin.trim().length < 2) invalid.add('origin')
   if (!(group >= 1 && group <= 50)) invalid.add('groupSize')
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(form.email.trim())) invalid.add('email')
+  if (!EMAIL_PATTERN.test(form.email.trim())) invalid.add('email')
+  if (!isPasswordValid(form.password)) invalid.add('password')
+  if (form.passwordConfirm !== form.password) invalid.add('passwordConfirm')
   if (!form.visitDate) invalid.add('visitDate')
   if (!form.consent) invalid.add('consent')
 
@@ -45,11 +49,11 @@ export default function AuthScreen({ initialMode, install, onEnter, onToast }) {
   const [mode, setMode] = useState(initialMode)
   const [form, setForm] = useState({
     fullName: '',
-    documentType: 'CC',
-    documentNumber: '',
     origin: '',
     groupSize: '1',
     email: '',
+    password: '',
+    passwordConfirm: '',
     visitDate: minDate,
     reason: 'TOURISM',
     consent: false,
@@ -59,7 +63,7 @@ export default function AuthScreen({ initialMode, install, onEnter, onToast }) {
   const [privacyOpen, setPrivacyOpen] = useState(false)
 
   const formRef = useRef(null)
-  const registerTabRef = useRef(null)
+  const loginTabRef = useRef(null)
   const register = useRegisterVisitor()
   const login = useLoginVisitor()
   const pending = register.isPending || login.isPending
@@ -106,20 +110,14 @@ export default function AuthScreen({ initialMode, install, onEnter, onToast }) {
     if (pending) return
 
     if (mode === 'ingreso') {
-      const number = form.documentNumber.trim()
-      if (!isDocumentValid(form.documentType, number)) return showErrors(new Set(['documentNumber']))
+      const errors = new Set()
+      if (!EMAIL_PATTERN.test(form.email.trim())) errors.add('email')
+      if (!form.password) errors.add('password')
+      if (errors.size > 0) return showErrors(errors)
       setInvalid(new Set())
       login.mutate(
-        { documentType: form.documentType, documentNumber: number },
-        {
-          onSuccess: onEnter,
-          onError: (error) => {
-            if (error.status !== 404) return
-            onToast(error.message)
-            changeMode('registro')
-            registerTabRef.current?.focus()
-          },
-        },
+        { email: form.email.trim(), password: form.password },
+        { onSuccess: onEnter },
       )
       return
     }
@@ -131,16 +129,24 @@ export default function AuthScreen({ initialMode, install, onEnter, onToast }) {
     register.mutate(
       {
         fullName: form.fullName.trim(),
-        documentType: form.documentType,
-        documentNumber: form.documentNumber.trim(),
         origin: form.origin.trim(),
         groupSize: parseInt(form.groupSize, 10),
         email: form.email.trim(),
+        password: form.password,
         visitDate: form.visitDate,
         reason: form.reason,
         dataConsentAccepted: form.consent,
       },
-      { onSuccess: onEnter },
+      {
+        onSuccess: onEnter,
+        onError: (error) => {
+          // El correo ya existe con otra contraseña: lo más probable es que deba ingresar
+          if (error.status !== 409 || !error.message.includes('correo')) return
+          onToast(error.message)
+          changeMode('ingreso')
+          loginTabRef.current?.focus()
+        },
+      },
     )
   }
 
@@ -165,7 +171,6 @@ export default function AuthScreen({ initialMode, install, onEnter, onToast }) {
           <button
             type="button"
             role="tab"
-            ref={registerTabRef}
             aria-selected={mode === 'registro'}
             onClick={() => changeMode('registro')}
           >
@@ -174,6 +179,7 @@ export default function AuthScreen({ initialMode, install, onEnter, onToast }) {
           <button
             type="button"
             role="tab"
+            ref={loginTabRef}
             aria-selected={mode === 'ingreso'}
             onClick={() => changeMode('ingreso')}
           >
@@ -198,36 +204,51 @@ export default function AuthScreen({ initialMode, install, onEnter, onToast }) {
             </div>
           )}
 
-          <div className="row-2">
-            <div className="field">
-              <label htmlFor="f-tipodoc">Tipo de documento</label>
-              <select
-                id="f-tipodoc"
-                required
-                value={form.documentType}
-                onChange={(e) => setField('documentType', e.target.value)}
-              >
-                <option value="CC">C.C.</option>
-                <option value="CE">C.E.</option>
-                <option value="TI">T.I.</option>
-                <option value="PA">Pasaporte</option>
-              </select>
-            </div>
-            <div className={fieldClass('documentNumber')}>
-              <label htmlFor="f-doc">Número</label>
-              <input
-                id="f-doc"
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                placeholder="1234567890"
-                required
-                value={form.documentNumber}
-                onChange={(e) => setField('documentNumber', e.target.value)}
-              />
-              <div className="err">Documento no válido.</div>
+          <div className={fieldClass('email')}>
+            <label htmlFor="f-correo">Correo electrónico</label>
+            <input
+              id="f-correo"
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              placeholder="tucorreo@ejemplo.com"
+              required
+              value={form.email}
+              onChange={(e) => setField('email', e.target.value)}
+            />
+            <div className="err">Escribe un correo válido.</div>
+          </div>
+
+          <div className={fieldClass('password')}>
+            <label htmlFor="f-clave">Contraseña</label>
+            <input
+              id="f-clave"
+              type="password"
+              autoComplete={mode === 'registro' ? 'new-password' : 'current-password'}
+              placeholder={mode === 'registro' ? 'Mínimo 8 caracteres' : ''}
+              required
+              value={form.password}
+              onChange={(e) => setField('password', e.target.value)}
+            />
+            <div className="err">
+              {mode === 'registro' ? 'La contraseña debe tener entre 8 y 72 caracteres.' : 'Escribe tu contraseña.'}
             </div>
           </div>
+
+          {mode === 'registro' && (
+            <div className={fieldClass('passwordConfirm')}>
+              <label htmlFor="f-clave2">Confirmar contraseña</label>
+              <input
+                id="f-clave2"
+                type="password"
+                autoComplete="new-password"
+                required
+                value={form.passwordConfirm}
+                onChange={(e) => setField('passwordConfirm', e.target.value)}
+              />
+              <div className="err">Las contraseñas no coinciden.</div>
+            </div>
+          )}
 
           {mode === 'registro' && (
             <div>
@@ -258,21 +279,6 @@ export default function AuthScreen({ initialMode, install, onEnter, onToast }) {
                   />
                   <div className="err">Entre 1 y 50.</div>
                 </div>
-              </div>
-
-              <div className={fieldClass('email')}>
-                <label htmlFor="f-correo">Correo electrónico</label>
-                <input
-                  id="f-correo"
-                  type="email"
-                  autoComplete="email"
-                  inputMode="email"
-                  placeholder="tucorreo@ejemplo.com"
-                  required
-                  value={form.email}
-                  onChange={(e) => setField('email', e.target.value)}
-                />
-                <div className="err">Escribe un correo válido.</div>
               </div>
 
               <div className="row-2">

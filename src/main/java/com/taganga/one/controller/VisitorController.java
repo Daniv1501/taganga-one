@@ -33,7 +33,7 @@ public class VisitorController {
                 .body(service.register(request));
     }
 
-    // POST y no GET: el número de documento no debe quedar en URLs ni en logs.
+    // POST y no GET: la contraseña no debe quedar en URLs ni en logs.
     @PostMapping("/login")
     public ResponseEntity<VisitorResponse> login(
             @Valid @RequestBody VisitorLoginRequest request) {
