@@ -16,7 +16,10 @@ arquitectura de DeepBlue Rescue:
 
 - **Backend:** Java 21, Spring Boot 4, Spring Data JPA / Hibernate, MapStruct, Flyway y
   PostgreSQL, con pruebas de integración reales mediante Testcontainers.
-- **Frontend:** [`taganga-ui/`](taganga-ui/), con React, Vite, TanStack Query y Leaflet.
+- **Frontend:** repositorio aparte, [Daniv1501/frontend-taganga-ui](https://github.com/Daniv1501/frontend-taganga-ui),
+  con React, Vite, TanStack Query y Leaflet.
+
+Este repositorio contiene solo el backend (API REST).
 
 El asistente es **simulado**: responde por coincidencia de palabras clave, sin IA real.
 
@@ -100,19 +103,15 @@ Por defecto se conecta a `jdbc:postgresql://localhost:5432/taganga` con usuario 
 mvn spring-boot:run
 ```
 
-**Frontend** (puerto 5173, reenvía `/api` al backend):
+**Frontend:** vive en [frontend-taganga-ui](https://github.com/Daniv1501/frontend-taganga-ui);
+las instrucciones están en su README.
+
+**CORS:** como el frontend se sirve desde otro origen, el backend solo acepta peticiones a
+`/api/**` de los orígenes en `APP_CORS_ALLOWED_ORIGINS` (separados por coma). Por defecto,
+`http://localhost:5173,http://localhost:4173` (Vite en desarrollo y `vite preview`). En producción:
 
 ```bash
-cd taganga-ui
-npm install
-npm run dev
-```
-
-El service worker solo se activa en el build, para probarlo:
-
-```bash
-npm run build
-npm run preview
+APP_CORS_ALLOWED_ORIGINS=https://taganga.ejemplo.com mvn spring-boot:run
 ```
 
 ## 7. Instrucciones para ejecutar los tests
@@ -176,7 +175,7 @@ taganga-one/
 ├── src/main
 │   ├── java/com/taganga/one
 │   │   ├── TagangaOneApplication.java
-│   │   ├── config/        (reloj en hora de Colombia)
+│   │   ├── config/        (reloj en hora de Colombia, CORS)
 │   │   ├── controller/    (REST)
 │   │   ├── domain/        (entidades JPA + enums)
 │   │   ├── dto/           (request / response)
@@ -186,18 +185,9 @@ taganga-one/
 │   │   └── service/       (interfaces + impl)
 │   └── resources
 │       ├── application.yml
-│       └── db/migration   (V1, V2, V3, V4)
-├── src/test/java/com/taganga/one
-│   ├── PersistenceIntegrationTest.java
-│   ├── controller/
-│   └── service/
-└── taganga-ui/
-    ├── public/            (manifest, sw.js, íconos)
-    └── src
-        ├── api/
-        ├── components/
-        ├── hooks/
-        ├── utils/
-        ├── App.jsx
-        └── main.jsx
+│       └── db/migration   (V1 … V5)
+└── src/test/java/com/taganga/one
+    ├── PersistenceIntegrationTest.java
+    ├── controller/
+    └── service/
 ```
