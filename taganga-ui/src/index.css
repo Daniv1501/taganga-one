@@ -250,6 +250,21 @@ main{padding:16px 16px calc(var(--nav-h) + 24px + var(--safe-b))}
 .pop-title{font-weight:700;font-size:.95rem;color:var(--texto)}
 .pop-rule{font-size:.8rem;color:var(--texto-suave);margin-top:4px}
 
+/* Controles del mapa: botones más grandes, cómodos al tacto */
+#map .leaflet-bar{border:none;box-shadow:0 2px 8px rgba(0,0,0,.18);border-radius:10px;overflow:hidden}
+#map .leaflet-bar a{
+  width:36px;height:36px;line-height:36px;font-size:1.2rem;color:var(--azul-osc);
+  display:grid;place-items:center;
+}
+#map .leaflet-bar a:hover{background:var(--azul-claro)}
+#map .leaflet-bar a:focus-visible{outline:3px solid var(--azul);outline-offset:-3px}
+#map .leaflet-control-layers{border:none;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.18);font-family:inherit;font-size:.82rem}
+#map .leaflet-control-layers-toggle{width:36px;height:36px;background-size:20px}
+#map .leaflet-control-scale-line{border-color:var(--azul-osc);color:var(--azul-osc);background:rgba(255,255,255,.8)}
+.zone-tip{font-family:inherit;font-size:.8rem;font-weight:600;border-radius:8px;padding:4px 8px}
+#map path.leaflet-interactive{transition:stroke-width .15s,fill-opacity .15s}
+#map:fullscreen{height:100%!important;width:100%}
+
 /* --- Decálogo --- */
 .decalogo{border-top:5px solid var(--dorado)}
 .decalogo ol{list-style:none;padding:0 16px 8px;counter-reset:d}

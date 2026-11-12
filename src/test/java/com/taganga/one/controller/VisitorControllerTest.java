@@ -6,7 +6,7 @@ import com.taganga.one.dto.request.VisitorLoginRequest;
 import com.taganga.one.dto.response.VisitorResponse;
 import com.taganga.one.exception.BusinessRuleException;
 import com.taganga.one.exception.GlobalExceptionHandler;
-import com.taganga.one.exception.ResourceNotFoundException;
+import com.taganga.one.exception.InvalidCredentialsException;
 import com.taganga.one.service.VisitorService;
 
 import org.junit.jupiter.api.Test;
@@ -35,11 +35,10 @@ class VisitorControllerTest {
     private static final String VALID_BODY = """
             {
               "fullName": "María Pérez Gómez",
-              "documentType": "CC",
-              "documentNumber": "1234567890",
               "origin": "Bogotá",
               "groupSize": 2,
               "email": "maria@example.com",
+              "password": "clave-segura-1",
               "visitDate": "2026-12-01",
               "reason": "TOURISM",
               "dataConsentAccepted": true
@@ -72,7 +71,8 @@ class VisitorControllerTest {
                 .andExpect(jsonPath("$.fullName").value("María Pérez Gómez"))
                 .andExpect(jsonPath("$.groupSize").value(2))
                 .andExpect(jsonPath("$.email").doesNotExist())
-                .andExpect(jsonPath("$.documentNumber").doesNotExist());
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist());
     }
 
     @Test
@@ -83,11 +83,10 @@ class VisitorControllerTest {
                 .andExpect(jsonPath("$.error").value("Bad Request"))
                 .andExpect(jsonPath("$.message").value("Revisa los datos enviados."))
                 .andExpect(jsonPath("$.details.fullName").exists())
-                .andExpect(jsonPath("$.details.documentType").exists())
-                .andExpect(jsonPath("$.details.documentNumber").exists())
                 .andExpect(jsonPath("$.details.origin").exists())
                 .andExpect(jsonPath("$.details.groupSize").exists())
                 .andExpect(jsonPath("$.details.email").exists())
+                .andExpect(jsonPath("$.details.password").exists())
                 .andExpect(jsonPath("$.details.visitDate").exists())
                 .andExpect(jsonPath("$.details.reason").exists())
                 .andExpect(jsonPath("$.details.dataConsentAccepted").exists());
@@ -127,18 +126,22 @@ class VisitorControllerTest {
     }
 
     @Test
-    void shouldRejectLettersInNumericDocument() throws Exception {
-        postVisitor(VALID_BODY.replace("1234567890", "AB12345"))
+    void shouldRejectShortPassword() throws Exception {
+        postVisitor(VALID_BODY.replace("clave-segura-1", "corta"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.details.documentNumberValid").value("Documento no válido."));
+                .andExpect(jsonPath("$.details.password")
+                        .value("La contraseña debe tener entre 8 y 72 caracteres."));
+
+        verify(service, never()).register(any());
     }
 
     @Test
-    void shouldAcceptLettersInPassport() throws Exception {
-        when(service.register(any(CreateVisitorRequest.class))).thenReturn(RESPONSE);
-
-        postVisitor(VALID_BODY.replace("1234567890", "AB12345").replace("\"CC\"", "\"PA\""))
-                .andExpect(status().isCreated());
+    void shouldRejectPasswordLongerThan72Bytes() throws Exception {
+        // 40 eñes = 40 caracteres pero 80 bytes
+        postVisitor(VALID_BODY.replace("clave-segura-1", "ñ".repeat(40)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.passwordWithinLimit")
+                        .value("La contraseña debe tener entre 8 y 72 caracteres."));
     }
 
     @Test
@@ -169,25 +172,37 @@ class VisitorControllerTest {
         mockMvc.perform(post("/api/visitors/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                { "documentType": "CC", "documentNumber": "1234567890" }
+                                { "email": "maria@example.com", "password": "clave-segura-1" }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.visitorCode").value("TG-1000"));
     }
 
     @Test
-    void shouldReturn404WhenLoginDocumentDoesNotExist() throws Exception {
+    void shouldReturn401WhenCredentialsAreWrong() throws Exception {
         when(service.login(any(VisitorLoginRequest.class)))
-                .thenThrow(new ResourceNotFoundException("No encontramos ese documento. Completa tu registro."));
+                .thenThrow(new InvalidCredentialsException("Correo o contraseña incorrectos."));
 
         mockMvc.perform(post("/api/visitors/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                { "documentType": "CC", "documentNumber": "99999" }
+                                { "email": "maria@example.com", "password": "incorrecta" }
                                 """))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("Not Found"))
-                .andExpect(jsonPath("$.message").value("No encontramos ese documento. Completa tu registro."));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.message").value("Correo o contraseña incorrectos."));
+    }
+
+    @Test
+    void shouldRequireEmailAndPasswordToLogin() throws Exception {
+        mockMvc.perform(post("/api/visitors/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.email").exists())
+                .andExpect(jsonPath("$.details.password").exists());
+
+        verify(service, never()).login(any());
     }
 
     @Test

@@ -1,7 +1,6 @@
 package com.taganga.one;
 
 import com.taganga.one.domain.AssistantEntryType;
-import com.taganga.one.domain.DocumentType;
 import com.taganga.one.domain.GeoPoint;
 import com.taganga.one.domain.VisitReason;
 import com.taganga.one.domain.Visitor;
@@ -12,6 +11,8 @@ import com.taganga.one.dto.request.CreateVisitorRequest;
 import com.taganga.one.dto.request.VisitorLoginRequest;
 import com.taganga.one.dto.response.VisitorResponse;
 import com.taganga.one.dto.response.ZoneResponse;
+import com.taganga.one.exception.BusinessRuleException;
+import com.taganga.one.exception.InvalidCredentialsException;
 import com.taganga.one.repository.AssistantEntryRepository;
 import com.taganga.one.repository.DecalogueRuleRepository;
 import com.taganga.one.repository.VisitorRepository;
@@ -84,15 +85,20 @@ class PersistenceIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    private CreateVisitorRequest request(String fullName, String documentNumber) {
+    private static final String PASSWORD = "clave-segura-1";
+
+    // Hash de relleno con el largo de BCrypt: las pruebas de restricciones no lo verifican
+    private static final String HASH = "$2a$04$" + "a".repeat(53);
+
+    private CreateVisitorRequest request(String fullName, String email, String password) {
         return new CreateVisitorRequest(
-                fullName, DocumentType.CC, documentNumber, "Bogotá", 2,
-                "maria@example.com", LocalDate.now().plusDays(2), VisitReason.TOURISM, true);
+                fullName, "Bogotá", 2, email, password,
+                LocalDate.now().plusDays(2), VisitReason.TOURISM, true);
     }
 
-    private Visitor visitor(String code, String documentNumber) {
-        return new Visitor(code, "María Pérez", DocumentType.CC, documentNumber,
-                "maria@example.com", "Bogotá", 1, LocalDate.of(2026, 12, 1), VisitReason.TOURISM);
+    private Visitor visitor(String code, String email) {
+        return new Visitor(code, "María Pérez", email, HASH,
+                "Bogotá", 1, LocalDate.of(2026, 12, 1), VisitReason.TOURISM);
     }
 
     @Test
@@ -136,39 +142,54 @@ class PersistenceIntegrationTest {
 
     @Test
     void registerPersistsVisitorAndConsentThenLoginFindsIt() {
-        VisitorResponse registered = visitorService.register(request("María Pérez Gómez", "1234567"));
+        VisitorResponse registered = visitorService.register(
+                request("María Pérez Gómez", "Maria@Example.com", PASSWORD));
         entityManager.flush();
         entityManager.clear();
 
         assertThat(registered.visitorCode()).matches("TG-\\d{4,}");
 
         Visitor stored = visitorRepository.findByVisitorCode(registered.visitorCode()).orElseThrow();
+        assertThat(stored.getEmail()).isEqualTo("maria@example.com");
+        assertThat(stored.getPasswordHash()).startsWith("$2").hasSize(60);
         assertThat(stored.getConsents()).hasSize(1);
         assertThat(stored.getConsents().get(0).getLegalBasis())
                 .isEqualTo("Ley 1581 de 2012 / Decreto 1377 de 2013");
 
         VisitorResponse loggedIn = visitorService.login(
-                new VisitorLoginRequest(DocumentType.CC, "1234567"));
+                new VisitorLoginRequest("maria@example.com", PASSWORD));
         assertThat(loggedIn.visitorCode()).isEqualTo(registered.visitorCode());
+
+        assertThrows(InvalidCredentialsException.class, () -> visitorService.login(
+                new VisitorLoginRequest("maria@example.com", "incorrecta")));
     }
 
     @Test
-    void registeringSameDocumentReplacesRecordAndKeepsConsentHistory() {
-        VisitorResponse first = visitorService.register(request("María Pérez Gómez", "7654321"));
+    void registeringSameEmailAndPasswordReplacesRecordAndKeepsConsentHistory() {
+        VisitorResponse first = visitorService.register(
+                request("María Pérez Gómez", "ana@example.com", PASSWORD));
         entityManager.flush();
 
-        VisitorResponse second = visitorService.register(request("María Pérez Actualizada", "7654321"));
+        VisitorResponse second = visitorService.register(
+                request("María Pérez Actualizada", "ana@example.com", PASSWORD));
         entityManager.flush();
         entityManager.clear();
 
         assertThat(second.visitorCode()).isNotEqualTo(first.visitorCode());
         assertThat(visitorRepository.findByVisitorCode(first.visitorCode())).isEmpty();
 
-        Visitor stored = visitorRepository
-                .findByDocumentTypeAndDocumentNumber(DocumentType.CC, "7654321")
-                .orElseThrow();
+        Visitor stored = visitorRepository.findByEmail("ana@example.com").orElseThrow();
         assertThat(stored.getFullName()).isEqualTo("María Pérez Actualizada");
         assertThat(stored.getConsents()).hasSize(2);
+    }
+
+    @Test
+    void registeringSameEmailWithAnotherPasswordIsRejected() {
+        visitorService.register(request("María Pérez Gómez", "luz@example.com", PASSWORD));
+        entityManager.flush();
+
+        assertThrows(BusinessRuleException.class, () -> visitorService.register(
+                request("Otra Persona", "luz@example.com", "otra-clave-9")));
     }
 
     @Test
@@ -181,26 +202,32 @@ class PersistenceIntegrationTest {
     }
 
     @Test
-    void duplicateDocumentViolatesUniqueConstraint() {
-        visitorRepository.saveAndFlush(visitor("TG-A", "1111111"));
+    void duplicateEmailViolatesUniqueConstraint() {
+        visitorRepository.saveAndFlush(visitor("TG-A", "a@example.com"));
 
         assertThrows(DataIntegrityViolationException.class,
-                () -> visitorRepository.saveAndFlush(visitor("TG-B", "1111111")));
+                () -> visitorRepository.saveAndFlush(visitor("TG-B", "a@example.com")));
+    }
+
+    @Test
+    void uppercaseEmailViolatesCheckConstraint() {
+        assertThrows(DataIntegrityViolationException.class,
+                () -> visitorRepository.saveAndFlush(visitor("TG-E", "Mayus@example.com")));
     }
 
     @Test
     void duplicateVisitorCodeViolatesUniqueConstraint() {
-        visitorRepository.saveAndFlush(visitor("TG-C", "2222222"));
+        visitorRepository.saveAndFlush(visitor("TG-C", "c1@example.com"));
 
         assertThrows(DataIntegrityViolationException.class,
-                () -> visitorRepository.saveAndFlush(visitor("TG-C", "3333333")));
+                () -> visitorRepository.saveAndFlush(visitor("TG-C", "c2@example.com")));
     }
 
     @Test
     void groupSizeCheckConstraintIsEnforced() {
         assertThrows(DataIntegrityViolationException.class,
                 () -> visitorRepository.saveAndFlush(new Visitor(
-                        "TG-D", "María Pérez", DocumentType.CC, "4444444", "maria@example.com",
+                        "TG-D", "María Pérez", "d@example.com", HASH,
                         "Bogotá", 51, LocalDate.of(2026, 12, 1), VisitReason.TOURISM)));
     }
 

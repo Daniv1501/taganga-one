@@ -27,7 +27,7 @@ export default function App() {
     save(SESSION_KEY, null)
     setVisitor(null)
     setAuthMode('ingreso')
-    showToast('Sesión cerrada. Puedes volver a ingresar con tu documento.')
+    showToast('Sesión cerrada. Puedes volver a ingresar con tu correo y contraseña.')
   }
 
   return (

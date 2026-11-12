@@ -5,17 +5,19 @@ import com.taganga.one.dto.request.CreateVisitorRequest;
 import com.taganga.one.dto.request.VisitorLoginRequest;
 import com.taganga.one.dto.response.VisitorResponse;
 import com.taganga.one.exception.BusinessRuleException;
-import com.taganga.one.exception.ResourceNotFoundException;
+import com.taganga.one.exception.InvalidCredentialsException;
 import com.taganga.one.mapper.VisitorMapper;
 import com.taganga.one.repository.VisitorRepository;
 import com.taganga.one.service.VisitorService;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 @Service
 @Transactional(readOnly = true)
@@ -23,19 +25,28 @@ public class VisitorServiceImpl implements VisitorService {
 
     static final String LEGAL_BASIS = "Ley 1581 de 2012 / Decreto 1377 de 2013";
 
+    static final String INVALID_CREDENTIALS = "Correo o contraseña incorrectos.";
+
+    static final String EMAIL_TAKEN =
+            "Ese correo ya está registrado con otra contraseña. Ingresa con tu contraseña.";
+
     private final VisitorRepository repository;
 
     private final VisitorMapper mapper;
+
+    private final PasswordEncoder passwordEncoder;
 
     private final Clock clock;
 
     public VisitorServiceImpl(
             VisitorRepository repository,
             VisitorMapper mapper,
+            PasswordEncoder passwordEncoder,
             Clock clock) {
 
         this.repository = repository;
         this.mapper = mapper;
+        this.passwordEncoder = passwordEncoder;
         this.clock = clock;
     }
 
@@ -50,25 +61,26 @@ public class VisitorServiceImpl implements VisitorService {
             );
         }
 
-        String documentNumber = request.documentNumber().trim();
+        String email = normalizeEmail(request.email());
         String fullName = request.fullName().trim();
-        String email = request.email().trim();
         String origin = request.origin().trim();
-        String visitorCode = "TG-" + repository.nextVisitorCodeNumber();
 
-        // Regla 2: un documento solo tiene un registro; si ya existía, se reemplaza.
-        Visitor visitor = repository
-                .findByDocumentTypeAndDocumentNumber(request.documentType(), documentNumber)
+        // Regla 2: un correo tiene un solo registro. Solo quien conoce la contraseña
+        // puede reemplazarlo; si no coincide, el registro se rechaza.
+        Visitor visitor = repository.findByEmail(email)
                 .map(existing -> {
+                    if (!passwordEncoder.matches(request.password(), existing.getPasswordHash())) {
+                        throw new BusinessRuleException(EMAIL_TAKEN);
+                    }
                     existing.replaceRegistration(
-                            visitorCode, fullName, email, origin,
+                            nextVisitorCode(), fullName, origin,
                             request.groupSize(), request.visitDate(), request.reason());
                     return existing;
                 })
                 .orElseGet(() -> new Visitor(
-                        visitorCode, fullName, request.documentType(), documentNumber,
-                        email, origin, request.groupSize(),
-                        request.visitDate(), request.reason()));
+                        nextVisitorCode(), fullName, email,
+                        passwordEncoder.encode(request.password()), origin,
+                        request.groupSize(), request.visitDate(), request.reason()));
 
         // Regla 3: toda autorización de datos queda registrada como prueba (Ley 1581).
         visitor.recordConsent(LEGAL_BASIS, LocalDateTime.now(clock));
@@ -79,11 +91,18 @@ public class VisitorServiceImpl implements VisitorService {
     @Override
     public VisitorResponse login(VisitorLoginRequest request) {
 
-        return repository
-                .findByDocumentTypeAndDocumentNumber(
-                        request.documentType(), request.documentNumber().trim())
+        return repository.findByEmail(normalizeEmail(request.email()))
+                .filter(visitor -> passwordEncoder.matches(
+                        request.password(), visitor.getPasswordHash()))
                 .map(mapper::toResponse)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "No encontramos ese documento. Completa tu registro."));
+                .orElseThrow(() -> new InvalidCredentialsException(INVALID_CREDENTIALS));
+    }
+
+    private String nextVisitorCode() {
+        return "TG-" + repository.nextVisitorCodeNumber();
+    }
+
+    private static String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 }
